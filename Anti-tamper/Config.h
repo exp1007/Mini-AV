@@ -12,7 +12,7 @@ namespace Config {
 		bool ViewLogs = false;
 
 		// Process
-		ProcEntity ProtectedProc = { };
+		ProcEntity ProtectedProc = { "" , (unsigned long)0 };
 		bool IsProtected = false;
     };
 

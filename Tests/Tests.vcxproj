@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{f47e52d6-e401-438a-a775-d9dce9336f68}</ProjectGuid>
-    <RootNamespace>Antitamper</RootNamespace>
+    <ProjectGuid>{f22b1063-6ed7-4e2e-9c5b-00cc8e3d388c}</ProjectGuid>
+    <RootNamespace>Tests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -43,14 +43,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -70,14 +70,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(MSBuildProjectDirectory)\UI\ImGui;$(IncludePath)</IncludePath>
-    <LibraryPath>$(DXSDK_DIR)lib\x64;$(DXSDK_DIR)lib\x86;$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(MSBuildProjectDirectory)\UI\ImGui;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(DXSDK_DIR)lib\x64;$(DXSDK_DIR)lib\x86;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -112,14 +104,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d9.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -131,53 +119,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d9.lib;d3dx9.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Alerts\Alerts.cpp" />
-    <ClCompile Include="Config.cpp" />
-    <ClCompile Include="Logs\Logs.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Protections\Handles.cpp" />
-    <ClCompile Include="Protections\Protections.cpp" />
-    <ClCompile Include="UI\Components.cpp" />
-    <ClCompile Include="UI\ImGui\imgui.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_demo.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_draw.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_impl_dx9.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_impl_win32.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_tables.cpp" />
-    <ClCompile Include="UI\ImGui\imgui_widgets.cpp" />
-    <ClCompile Include="UI\UI.cpp" />
-    <ClCompile Include="Utils\Utils.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Alerts\Alerts.h" />
-    <ClInclude Include="Config.h" />
-    <ClInclude Include="json.hpp" />
-    <ClInclude Include="Logs\Logs.h" />
-    <ClInclude Include="Protections\Protections.h" />
-    <ClInclude Include="UI\Globals.h" />
-    <ClInclude Include="UI\ImGui\imconfig.h" />
-    <ClInclude Include="UI\ImGui\imgui.h" />
-    <ClInclude Include="UI\ImGui\imgui_impl_dx9.h" />
-    <ClInclude Include="UI\ImGui\imgui_impl_win32.h" />
-    <ClInclude Include="UI\ImGui\imgui_internal.h" />
-    <ClInclude Include="UI\ImGui\imstb_rectpack.h" />
-    <ClInclude Include="UI\ImGui\imstb_textedit.h" />
-    <ClInclude Include="UI\ImGui\imstb_truetype.h" />
-    <ClInclude Include="UI\UI.h" />
-    <ClInclude Include="Utils\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

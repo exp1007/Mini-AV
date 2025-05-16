@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+
 namespace Utils {
     std::string GetProcName(DWORD processID)
     {
@@ -38,11 +39,29 @@ namespace Utils {
         unsigned int i;
         std::unordered_set<std::string> ProcWhiteList{
             "<unknown>",
+            "System",
+            "System Idle Process",
+            "Idle",
             "svchost.exe",
             "winlogon.exe",
+            "csrss.exe",
+            "smss.exe",
+            "lsass.exe",
+            "services.exe",
             "RuntimeBroker.exe",
             "conhost.exe",
-            "dwm.exe"
+            "dwm.exe",
+            "wininit.exe",
+            "taskhostw.exe",
+            "sihost.exe",
+            "fontdrvhost.exe",
+            "audiodg.exe",
+            "WUDFHost.exe",
+            "SearchIndexer.exe",
+            "ctfmon.exe",
+            "spoolsv.exe",
+            "ShellExperienceHost.exe",
+            "StartMenuExperienceHost.exe"
         };
 
         if (!EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded))
@@ -75,5 +94,14 @@ namespace Utils {
         }
 
         return FinalStr;
+    }
+
+    std::string WideToMultiByte(WCHAR* pwstr) {
+        if (!pwstr) return {};
+
+        int sizeNeeded = WideCharToMultiByte(CP_ACP, 0, pwstr, -1, nullptr, 0, nullptr, nullptr);
+        std::string result(sizeNeeded - 1, 0);
+        WideCharToMultiByte(CP_ACP, 0, pwstr, -1, result.data(), sizeNeeded, nullptr, nullptr);
+        return result;
     }
 }

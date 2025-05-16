@@ -8,7 +8,7 @@
 
 struct ProcEntity {
 	std::string Name{ };
-	DWORD PID = NULL;
+	DWORD PID = (unsigned long)-1;
 };
 
 namespace Globals {
@@ -18,4 +18,6 @@ namespace Globals {
 	inline std::vector<std::string> Logs;
 	inline std::vector<AlertEntity> Alerts;
 	inline std::vector<std::string> Threats;
+
+	inline int ScanDelay = 1; // 1 sec defautl delay
 }

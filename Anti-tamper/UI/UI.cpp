@@ -83,6 +83,9 @@ int UI::Run()
             ::DispatchMessage(&msg);
             if (msg.message == WM_QUIT)
                 done = true;
+
+            if (msg.message == WM_SIZE)
+                printf("a");
         }
         if (done)
             break;

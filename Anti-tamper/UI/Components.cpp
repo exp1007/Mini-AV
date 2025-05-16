@@ -4,6 +4,7 @@
 #include "../Logs/Logs.h"
 #include "../Config.h"
 #include "../Alerts/Alerts.h"
+#include "../Protections/Protections.h"
 
 #include <string>
 #include <vector>
@@ -32,8 +33,9 @@ void UI::Components::MainWindow() {
 			ImGui::MenuItem("Config window", NULL, &Config::Data.ConfigsWindow);
 			ImGui::EndMenu();
 		}
+
+		ImGui::EndMenuBar();
 	}
-	ImGui::EndMenuBar();
 
 	// Childs
 	ImVec2 ChildSize = ImGui::GetWindowSize();
@@ -41,22 +43,20 @@ void UI::Components::MainWindow() {
 	ChildSize.y = ChildSize.y / 2 - Style.WindowPadding.y * 2;
 
 	if (ImGui::BeginChild("First child", { ChildSize.x,0 }, ImGuiChildFlags_Border)) {
-		static std::vector<ProcEntity> ProcessList;
-		
-
 		ImGui::Checkbox("Enable protection", &Config::Data.IsProtected);
 
 		ImGui::SeparatorText("Setup");
 
 		ImGui::SetNextWindowSizeConstraints({ 0,0 }, { FLT_MAX,500 });
 
+		static std::vector<ProcEntity> LocalProcessList;
 		if (ImGui::BeginPopup("Process list popup")) {
 			static char SearchBuff[255] = "";
-			ImGui::InputText("##SearchProcess", SearchBuff, IM_ARRAYSIZE(SearchBuff));
+			ImGui::InputText("Search...", SearchBuff, IM_ARRAYSIZE(SearchBuff));
 			std::string StrSearchBuff(SearchBuff);
 
 			if (ImGui::BeginListBox("##Process list")) {
-				for (auto& Proc : ProcessList) {
+				for (auto& Proc : LocalProcessList) {
 					// Filter
 					if (StrSearchBuff.size() > 0) {
 						if (Utils::StrToLower(Proc.Name).find(Utils::StrToLower(StrSearchBuff)) == std::string::npos)
@@ -77,28 +77,28 @@ void UI::Components::MainWindow() {
 			}
 
 			if (ImGui::Button("Refresh"))
-				ProcessList = Utils::GetProcessList();
+				LocalProcessList = Utils::GetProcessList();
 
 			ImGui::EndPopup();
 		}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 14, 4 });
-		ImGui::BeginChild("Current process", { 0 ,100 }, ImGuiChildFlags_FrameStyle);
-		ImGui::Text("Process name: %s", Config::Data.ProtectedProc.Name.c_str());
-		ImGui::Text("PID: %d", Config::Data.ProtectedProc.PID);
-		ImGui::EndChild();
-		ImGui::PopStyleVar();
+		if (ImGui::BeginChild("Current process", { ImGui::CalcItemWidth() ,100 }, ImGuiChildFlags_FrameStyle)) {
+			ImGui::Text("Process name: %s", Config::Data.ProtectedProc.Name.c_str());
+			ImGui::Text("PID: %d", Config::Data.ProtectedProc.PID);
+			ImGui::EndChild();
+		}
+
 
 		if (ImGui::Button("Select process")) {
 			ImGui::OpenPopup("Process list popup");
-			ProcessList = Utils::GetProcessList();
+			LocalProcessList = Utils::GetProcessList();
 		}
 
 		ImGui::SeparatorText("Protections");
-
-		ImGui::EndChild();
+		ImGui::SliderInt("Scan delay (sec)", &Globals::ScanDelay, 0, 10);
 
 	}
+	ImGui::EndChild();
 
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Style.WindowPadding.x, Style.ItemSpacing.y });
 	ImGui::SameLine();
@@ -109,6 +109,7 @@ void UI::Components::MainWindow() {
 		if (Config::Data.ViewAlerts) {
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 14, 4 });
 			ImGui::Text("Alerts");
+
 			ImGui::BeginChild("Alerts terminal", { 0,200 }, ImGuiChildFlags_FrameStyle);
 
 			ImGuiListClipper clipper;
@@ -125,6 +126,7 @@ void UI::Components::MainWindow() {
 		if (Config::Data.ViewLogs) {
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 14, 4 });
 			ImGui::Text("Logs terminal");
+
 			ImGui::BeginChild("Logs terminal", { 0,200 }, ImGuiChildFlags_FrameStyle);
 
 			ImGuiListClipper clipper;
@@ -137,8 +139,8 @@ void UI::Components::MainWindow() {
 			ImGui::PopStyleVar();
 		}
 
-		ImGui::EndChild();
 	}
+	ImGui::EndChild();
 	ImGui::PopStyleVar();
 
 	ImGui::End();
@@ -152,7 +154,7 @@ void UI::Components::Configs() {
 
 	static char ConfigName[255] = { };
 	ImGui::InputText("Config name", ConfigName, 255);
-	if (ImGui::Button("Save config"))
+	if (ImGui::Button("Save config", {0,0}))
 		Config::SaveConfig(ConfigName);
 	if(ImGui::Button("Load config"))
 		Config::LoadConfig(ConfigName);
