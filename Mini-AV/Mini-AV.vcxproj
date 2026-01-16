@@ -24,6 +24,7 @@
     <ProjectGuid>{f47e52d6-e401-438a-a775-d9dce9336f68}</ProjectGuid>
     <RootNamespace>Antitamper</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Mini-AV</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

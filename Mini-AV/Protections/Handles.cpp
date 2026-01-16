@@ -4,13 +4,7 @@
 
 #include <Windows.h>
 #include <stdio.h>
-
-struct HandleEntity {
-    DWORD PID;
-    uint16_t Handle;
-    std::wstring Name;
-    DWORD AccessMask;
-};
+#include <set>
 
 // https://cplusplus.com/forum/windows/95774/
 
@@ -110,8 +104,22 @@ PVOID GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName) {
     return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
 }
 
-// Handles code imported from https://cplusplus.com/forum/windows/95774/
-void GetHandles(DWORD PID,  std::string TargetProcName, std::vector<HandleEntity>* Handles) {
+struct HandleEntity {
+    DWORD PID;
+    uint16_t Handle;
+    std::string Name;
+    DWORD AccessMask;
+
+    bool operator<(const HandleEntity& other) const {
+        return Handle < other.Handle;
+    }
+    bool operator==(const HandleEntity& other) const {
+        return Handle == other.Handle && PID == other.PID;
+    }
+};
+
+// Handle enumeration from https://cplusplus.com/forum/windows/95774/
+void GetHandles(DWORD PID,  std::string TargetProcName, std::set<HandleEntity>* HandlesList) {
     _NtQuerySystemInformation NtQuerySystemInformation = (_NtQuerySystemInformation)GetLibraryProcAddress((char*)("ntdll.dll"), (char*)("NtQuerySystemInformation"));
     _NtDuplicateObject NtDuplicateObject = (_NtDuplicateObject)GetLibraryProcAddress((char*)("ntdll.dll"), (char*)("NtDuplicateObject"));
     _NtQueryObject NtQueryObject = (_NtQueryObject)GetLibraryProcAddress((char*)("ntdll.dll"), (char*)("NtQueryObject"));
@@ -211,8 +219,13 @@ void GetHandles(DWORD PID,  std::string TargetProcName, std::vector<HandleEntity
 
         if (Utils::WideToMultiByte(objectTypeInfo->Name.Buffer) == "Process") {
             DWORD AccessedPID = GetProcessId(dupHandle);
-            if (AccessedPID == Config::Data.ProtectedProc.PID)
-                printf("[%d]Correct\n");
+            if (AccessedPID == Config::Data.ProtectedProc.PID) {
+                HandleEntity TempHandleObj;
+                TempHandleObj.Handle = handle.Handle;
+                TempHandleObj.Handle = handle.ProcessId;
+                TempHandleObj.Name = Utils::GetProcName(handle.ProcessId);
+                HandlesList->insert(TempHandleObj);
+            }
         }
 
         free(objectTypeInfo);
@@ -225,17 +238,22 @@ void GetHandles(DWORD PID,  std::string TargetProcName, std::vector<HandleEntity
 }
 
 void Protections::CheckHandles() {
-    static std::vector<HandleEntity> OldProcessHandles;
-    std::vector<HandleEntity> ProcessHandles;
+    static std::set<HandleEntity> OldHandles;
+    std::set<HandleEntity> CurrHandles;
 
+    CurrHandles.clear();
     for (auto proc : Protections::ProcessList) {
         if(proc.Name == "Tests.exe")
-            GetHandles(proc.PID, Config::Data.ProtectedProc.Name, & ProcessHandles);
+            GetHandles(proc.PID, Config::Data.ProtectedProc.Name, &CurrHandles);
     }
 
-    //for (auto H : ProcessHandles) {
-    //    if (std::find(OldProcessHandles.begin(), OldProcessHandles.end(), H) == OldProcessHandles.end()) {
+    if (OldHandles.size() == 0) {
+        OldHandles.insert(CurrHandles.begin(), CurrHandles.end());
+        return;
+    }
 
-    //    }
-    //}
+    for (auto h : CurrHandles) {
+        if(OldHandles.find(h) == OldHandles.end())
+            printf("[HandleScanner] New handle (%d) accessing (%s) from process (%s) \n", h.Handle, Config::Data.ProtectedProc.Name.c_str(), h.Name.c_str());
+    }
 }

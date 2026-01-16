@@ -4,6 +4,8 @@
 #include <Windows.h>
 
 namespace Utils {
+	// Process
+	std::string GetProcName(DWORD processID);
 	std::vector<ProcEntity> GetProcessList();
 
 	// Strings
