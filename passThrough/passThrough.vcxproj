@@ -144,8 +144,8 @@
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="passThrough.c" />
-    <ResourceCompile Include="passThrough.rc" />
+    <ClCompile Include="PassThrough.c" />
+    <ResourceCompile Include="PassThrough.rc" />
   </ItemGroup>
   <ItemGroup>
     <Inf Exclude="@(Inf)" Include="*.inf" />

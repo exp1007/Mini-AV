@@ -19,12 +19,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="passThrough.c">
+    <ClCompile Include="PassThrough.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="passThrough.rc">
+    <ResourceCompile Include="PassThrough.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>

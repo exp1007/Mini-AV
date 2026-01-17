@@ -1,7 +1,7 @@
 #include "UI.h"
 #include "Globals.h"
 #include "../Utils/Utils.h"
-#include "../Logs/Logs.h"
+#include "../Logging/Logging.h"
 #include "../Config.h"
 #include "../Alerts/Alerts.h"
 #include "../Protections/Protections.h"

@@ -25,14 +25,14 @@
     <Filter Include="Source Files\Protections">
       <UniqueIdentifier>{c7561229-b794-4d85-b53d-581530665a9c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Logs">
-      <UniqueIdentifier>{55df6698-a4d2-4891-a9ca-50b0728c14ad}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Alerts">
       <UniqueIdentifier>{8d68d840-7080-4a75-af0f-e167b022d9e1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Protections\Package">
       <UniqueIdentifier>{e299f182-4379-4f08-b709-b3716ae8f31e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Log">
+      <UniqueIdentifier>{55df6698-a4d2-4891-a9ca-50b0728c14ad}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -72,8 +72,8 @@
     <ClCompile Include="Config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Logs\Logs.cpp">
-      <Filter>Source Files\Logs</Filter>
+    <ClCompile Include="Logging\Logging.cpp">
+      <Filter>Source Files\Log</Filter>
     </ClCompile>
     <ClCompile Include="Alerts\Alerts.cpp">
       <Filter>Source Files\Alerts</Filter>
@@ -125,8 +125,8 @@
     <ClInclude Include="json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Logs\Logs.h">
-      <Filter>Source Files\Logs</Filter>
+    <ClInclude Include="Logging\Logging.h">
+      <Filter>Source Files\Log</Filter>
     </ClInclude>
     <ClInclude Include="Alerts\Alerts.h">
       <Filter>Source Files\Alerts</Filter>

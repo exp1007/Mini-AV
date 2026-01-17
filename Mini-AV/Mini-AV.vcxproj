@@ -147,7 +147,7 @@
   <ItemGroup>
     <ClCompile Include="Alerts\Alerts.cpp" />
     <ClCompile Include="Config.cpp" />
-    <ClCompile Include="Logs\Logs.cpp" />
+    <ClCompile Include="Logging\Logging.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Protections\Handles.cpp" />
     <ClCompile Include="Protections\Protections.cpp" />
@@ -166,7 +166,7 @@
     <ClInclude Include="Alerts\Alerts.h" />
     <ClInclude Include="Config.h" />
     <ClInclude Include="json.hpp" />
-    <ClInclude Include="Logs\Logs.h" />
+    <ClInclude Include="Logging\Logging.h" />
     <ClInclude Include="Protections\Protections.h" />
     <ClInclude Include="UI\Globals.h" />
     <ClInclude Include="UI\ImGui\imconfig.h" />

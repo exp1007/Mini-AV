@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tests", "Tests\Tests.vcxpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Mini-AV", "Mini-AV\Mini-AV.vcxproj", "{F47E52D6-E401-438A-A775-D9DCE9336F68}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PassThrough", "PassThrough\PassThrough.vcxproj", "{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{F47E52D6-E401-438A-A775-D9DCE9336F68}.Release|x64.Build.0 = Release|x64
 		{F47E52D6-E401-438A-A775-D9DCE9336F68}.Release|x86.ActiveCfg = Release|Win32
 		{F47E52D6-E401-438A-A775-D9DCE9336F68}.Release|x86.Build.0 = Release|Win32
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Debug|x64.ActiveCfg = Debug|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Debug|x64.Build.0 = Debug|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Debug|x86.ActiveCfg = Debug|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Debug|x86.Build.0 = Debug|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Release|x64.ActiveCfg = Release|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Release|x64.Build.0 = Release|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Release|x86.ActiveCfg = Release|x64
+		{D8B8DA25-0E6D-4631-8B25-DBF5B10B45AD}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
