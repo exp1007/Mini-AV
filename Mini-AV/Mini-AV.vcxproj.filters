@@ -63,7 +63,7 @@
     <ClCompile Include="UI\ImGui\imgui_widgets.cpp">
       <Filter>Source Files\UI\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="UI\Components.cpp">
+    <ClCompile Include="UI\Components\MainWindow.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
     <ClCompile Include="Utils\Utils.cpp">
@@ -83,6 +83,9 @@
     </ClCompile>
     <ClCompile Include="Protections\Protections.cpp">
       <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Communication\Communication.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -133,6 +136,12 @@
     </ClInclude>
     <ClInclude Include="Protections\Protections.h">
       <Filter>Source Files\Protections</Filter>
+    </ClInclude>
+    <ClInclude Include="Shared\MiniAvFilterMessages.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Communication\Communication.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

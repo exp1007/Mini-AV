@@ -4,13 +4,13 @@ Copyright (c) 1999 - 2002  Microsoft Corporation
 
 Module Name:
 
-    passThrough.c
+    PassThrough.c
 
 Abstract:
 
-    This is the main module of the passThrough miniFilter driver.
-    This filter hooks all IO operations for both pre and post operation
-    callbacks.  The filter passes through the operations.
+    This is the main module of the PassThrough minifilter driver. This filter
+    hooks all I/O operations for both pre and post operation callbacks. IRP_MJ_CREATE
+    is handled in MiniAvComm.c; other operations pass through.
 
 Environment:
 
@@ -22,10 +22,14 @@ Environment:
 #include <dontuse.h>
 #include <suppress.h>
 
+#include "MiniAvFilterMessages.h"
+#include "MiniAvComm.h"
+
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
 
 PFLT_FILTER gFilterHandle;
+PFLT_PORT gServerPort = NULL;
 ULONG_PTR OperationStatusCtx = 1;
 
 #define PTDBG_TRACE_ROUTINES            0x00000001
@@ -136,7 +140,7 @@ PtDoRequestOperationStatus(
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
     { IRP_MJ_CREATE,
       0,
-      PtPreOperationPassThrough,
+      PtPreOperationCreateMiniAv,
       PtPostOperationPassThrough },
 
     { IRP_MJ_CREATE_NAMED_PIPE,
@@ -546,6 +550,9 @@ Return Value:
 --*/
 {
     NTSTATUS status;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    OBJECT_ATTRIBUTES oa;
+    UNICODE_STRING uniPortName;
 
     UNREFERENCED_PARAMETER( RegistryPath );
 
@@ -562,18 +569,55 @@ Return Value:
 
     FLT_ASSERT( NT_SUCCESS( status ) );
 
-    if (NT_SUCCESS( status )) {
+    if (!NT_SUCCESS( status )) {
 
-        //
-        //  Start filtering i/o
-        //
+        return status;
+    }
 
-        status = FltStartFiltering( gFilterHandle );
+    status = FltBuildDefaultSecurityDescriptor( &sd, FLT_PORT_ALL_ACCESS );
 
-        if (!NT_SUCCESS( status )) {
+    if (!NT_SUCCESS( status )) {
 
-            FltUnregisterFilter( gFilterHandle );
-        }
+        FltUnregisterFilter( gFilterHandle );
+        return status;
+    }
+
+    RtlInitUnicodeString( &uniPortName, MINIAV_PORT_NAME );
+
+    InitializeObjectAttributes( &oa,
+                                &uniPortName,
+                                OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+                                NULL,
+                                sd );
+
+    status = FltCreateCommunicationPort( gFilterHandle,
+                                         &gServerPort,
+                                         &oa,
+                                         NULL,
+                                         PtMiniAvConnect,
+                                         PtMiniAvDisconnect,
+                                         PtMiniAvMessageNotify,
+                                         1 );
+
+    FltFreeSecurityDescriptor( sd );
+
+    if (!NT_SUCCESS( status )) {
+
+        FltUnregisterFilter( gFilterHandle );
+        return status;
+    }
+
+    //
+    //  Start filtering i/o
+    //
+
+    status = FltStartFiltering( gFilterHandle );
+
+    if (!NT_SUCCESS( status )) {
+
+        FltCloseCommunicationPort( gServerPort );
+        gServerPort = NULL;
+        FltUnregisterFilter( gFilterHandle );
     }
 
     return status;
@@ -609,6 +653,12 @@ Return Value:
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("PassThrough!PtUnload: Entered\n") );
 
+    if (gServerPort != NULL) {
+
+        FltCloseCommunicationPort( gServerPort );
+        gServerPort = NULL;
+    }
+
     FltUnregisterFilter( gFilterHandle );
 
     return STATUS_SUCCESS;
@@ -618,6 +668,29 @@ Return Value:
 /*************************************************************************
     MiniFilter callback routines.
 *************************************************************************/
+
+VOID
+PtPassthroughRequestOpStatusIfNeeded (
+    _Inout_ PFLT_CALLBACK_DATA Data
+    )
+{
+    NTSTATUS status;
+
+    if (PtDoRequestOperationStatus( Data )) {
+
+        status = FltRequestOperationStatusCallback( Data,
+                                                    PtOperationStatusCallback,
+                                                    (PVOID)(++OperationStatusCtx) );
+        if (!NT_SUCCESS( status )) {
+
+            PT_DBG_PRINT( PTDBG_TRACE_OPERATION_STATUS,
+                          ("PassThrough!PtPassthroughRequestOpStatusIfNeeded: FltRequestOperationStatusCallback Failed, status=%08x\n",
+                           status) );
+        }
+    }
+}
+
+
 FLT_PREOP_CALLBACK_STATUS
 PtPreOperationPassThrough (
     _Inout_ PFLT_CALLBACK_DATA Data,
@@ -653,35 +726,13 @@ Return Value:
 
 --*/
 {
-    NTSTATUS status;
-
     UNREFERENCED_PARAMETER( FltObjects );
     UNREFERENCED_PARAMETER( CompletionContext );
 
     PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
                   ("PassThrough!PtPreOperationPassThrough: Entered\n") );
 
-    //
-    //  See if this is an operation we would like the operation status
-    //  for.  If so request it.
-    //
-    //  NOTE: most filters do NOT need to do this.  You only need to make
-    //        this call if, for example, you need to know if the oplock was
-    //        actually granted.
-    //
-
-    if (PtDoRequestOperationStatus( Data )) {
-
-        status = FltRequestOperationStatusCallback( Data,
-                                                    PtOperationStatusCallback,
-                                                    (PVOID)(++OperationStatusCtx) );
-        if (!NT_SUCCESS(status)) {
-
-            PT_DBG_PRINT( PTDBG_TRACE_OPERATION_STATUS,
-                          ("PassThrough!PtPreOperationPassThrough: FltRequestOperationStatusCallback Failed, status=%08x\n",
-                           status) );
-        }
-    }
+    PtPassthroughRequestOpStatusIfNeeded( Data );
 
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }

@@ -6,6 +6,5 @@ namespace UI {
 
 	namespace Components {
 		void MainWindow();
-		void Configs();
 	}
 }

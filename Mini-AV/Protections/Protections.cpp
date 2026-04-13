@@ -6,7 +6,7 @@
 #include <thread>
 
 void Protections::Manager() {
-	while (true) {
+	while (Globals::AppIsRunning) {
 		long Delay = (long)(Globals::ScanDelay * 1000);
 		if (Delay == 0) Delay = 50; // 50 ms delay to avoid CPU burning :)
 		std::this_thread::sleep_for(std::chrono::milliseconds(Delay));

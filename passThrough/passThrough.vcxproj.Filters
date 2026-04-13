@@ -17,15 +17,34 @@
       <Extensions>inf;inv;inx;mof;mc;</Extensions>
       <UniqueIdentifier>{DA557823-C05E-48D3-AE3A-24D4FEC497E9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Mini-AV">
+      <UniqueIdentifier>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PassThrough.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MiniAvComm.c">
+      <Filter>Mini-AV</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="PassThrough.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="*.inf">
+      <Filter>Driver Files</Filter>
+    </Inf>
   </ItemGroup>
 </Project>

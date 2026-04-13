@@ -20,4 +20,5 @@ namespace Globals {
 	inline std::vector<std::string> Threats;
 
 	inline int ScanDelay = 1; // 1 sec defautl delay
+	inline bool AppIsRunning = true;
 }

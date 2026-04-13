@@ -1,5 +1,5 @@
-#include "UI.h"
-#include "Globals.h"
+#include "../UI.h"
+#include "../Globals.h"
 #include "../Utils/Utils.h"
 #include "../Logging/Logging.h"
 #include "../Config.h"
@@ -22,15 +22,22 @@ void UI::Components::MainWindow() {
 
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("View")) {
-			ImGui::MenuItem("Alerts", NULL, &Config::Data.ViewAlerts);
-			ImGui::MenuItem("Logs", NULL, &Config::Data.ViewLogs);
+			if (ImGui::MenuItem("Alerts", NULL, &Config::Data.ViewAlerts)) Config::SaveConfig();
+			if (ImGui::MenuItem("Logs", NULL, &Config::Data.ViewLogs)) Config::SaveConfig();
+			if (ImGui::MenuItem("Console Logs", NULL, &Config::Data.ViewConsoleLogs)) {
+				if (Config::Data.ViewConsoleLogs)
+					TerminalLogs::Initialize();
+				else
+					TerminalLogs::Shutdown();
+
+				Config::SaveConfig();
+			}
 			ImGui::EndMenu();
 		}
 
 		if (ImGui::BeginMenu("UI Framework")) {
-			ImGui::MenuItem("Demo window", NULL, &Config::Data.DebugWindow);
-			ImGui::MenuItem("Styles window", NULL, &Config::Data.StylesWindow);
-			ImGui::MenuItem("Config window", NULL, &Config::Data.ConfigsWindow);
+			if (ImGui::MenuItem("Demo window", NULL, &Config::Data.DebugWindow)) Config::SaveConfig();
+			if (ImGui::MenuItem("Styles window", NULL, &Config::Data.StylesWindow)) Config::SaveConfig();
 			ImGui::EndMenu();
 		}
 
@@ -43,7 +50,7 @@ void UI::Components::MainWindow() {
 	ChildSize.y = ChildSize.y / 2 - Style.WindowPadding.y * 2;
 
 	if (ImGui::BeginChild("First child", { ChildSize.x,0 }, ImGuiChildFlags_Border)) {
-		ImGui::Checkbox("Enable protection", &Config::Data.IsProtected);
+		if (ImGui::Checkbox("Enable protection", &Config::Data.IsProtected)) Config::SaveConfig();
 
 		ImGui::SeparatorText("Setup");
 
@@ -69,6 +76,7 @@ void UI::Components::MainWindow() {
 					if (ImGui::Selectable(FormatedProc.c_str(), IsSelected)) {
 						Config::Data.ProtectedProc = Proc;
 						Logs::Add("Selected protected process: " + Proc.Name + " (" + std::to_string(Proc.PID) + ")");
+						Config::SaveConfig();
 					}
 
 				}
@@ -147,17 +155,4 @@ void UI::Components::MainWindow() {
 
 	// Cleaning pushes
 	ImGui::PopStyleVar();
-}
-
-void UI::Components::Configs() {
-	ImGui::Begin("Configs", &Config::Data.ConfigsWindow);
-
-	static char ConfigName[255] = { };
-	ImGui::InputText("Config name", ConfigName, 255);
-	if (ImGui::Button("Save config", {0,0}))
-		Config::SaveConfig(ConfigName);
-	if(ImGui::Button("Load config"))
-		Config::LoadConfig(ConfigName);
-
-	ImGui::End();
 }

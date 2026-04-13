@@ -1,13 +1,14 @@
 #include "UI.h"
 #include "Globals.h"
+#include "../Config.h"
 
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
+
 #include <d3d9.h>
 #include <tchar.h>
 
-#include "../Config.h"
 
 // Data
 static LPDIRECT3D9              g_pD3D = nullptr;
@@ -124,8 +125,6 @@ int UI::Run()
         if (Config::Data.DebugWindow)
             ImGui::ShowDemoWindow(&Config::Data.DebugWindow);
 
-        if (Config::Data.ConfigsWindow)
-            UI::Components::Configs();
 
 
         ImGui::EndFrame();
@@ -144,6 +143,8 @@ int UI::Run()
         if (result == D3DERR_DEVICELOST)
             g_DeviceLost = true;
     }
+
+    Globals::AppIsRunning = false;
 
     ImGui_ImplDX9_Shutdown();
     ImGui_ImplWin32_Shutdown();

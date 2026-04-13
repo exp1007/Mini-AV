@@ -48,7 +48,7 @@ Dependencies     = "FltMgr"
 ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
 StartType        = 3                            ;SERVICE_DEMAND_START
 ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
-LoadOrderGroup   = "FSFilter Activity Monitor"
+LoadOrderGroup   = "FSFilter Anti-Virus"
 AddReg           = MiniFilter.AddRegistry
 
 [MiniFilter.AddRegistry]
@@ -94,7 +94,7 @@ Dependencies     = "FltMgr"
 ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
 StartType        = 3                            ;SERVICE_DEMAND_START
 ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
-LoadOrderGroup   = "FSFilter Activity Monitor"
+LoadOrderGroup   = "FSFilter Anti-Virus"
 AddReg           = MiniFilterDownlevel.AddRegistry
 
 [MiniFilterDownlevel.AddRegistry]
@@ -123,5 +123,5 @@ DiskId1                 = "PassThrough Device Installation Disk"
 ;Instances specific information.
 DefaultInstance         = "PassThrough Instance"
 Instance1.Name          = "PassThrough Instance"
-Instance1.Altitude      = "370030"
+Instance1.Altitude      = "328015"
 Instance1.Flags         = 0x0              ; Allow all attachments

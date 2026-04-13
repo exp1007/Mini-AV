@@ -404,3 +404,5 @@ FodyWeavers.xsd
 *.ini
 *.rar
 *.zip
+*.cfg
+.cursor/

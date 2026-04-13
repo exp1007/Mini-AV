@@ -5,11 +5,11 @@ namespace Config {
     struct CFGType {
 		// General/UI
 		bool DebugWindow = false;
-		bool ConfigsWindow = false;
 		bool StylesWindow = false;
 
 		bool ViewAlerts = false;
 		bool ViewLogs = false;
+		bool ViewConsoleLogs = false;
 
 		// Process
 		ProcEntity ProtectedProc = { "" , (unsigned long)0 };
@@ -18,6 +18,6 @@ namespace Config {
 
 	inline CFGType Data;
 
-	void SaveConfig(const std::string filename);
-	void LoadConfig(const std::string filename);
+	void SaveConfig();
+	void LoadConfig();
 }
