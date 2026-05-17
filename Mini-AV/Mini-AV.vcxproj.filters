@@ -96,8 +96,20 @@
     <ClCompile Include="Utils\Driver\Setup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\Scanner\Scanner.cpp">
-      <Filter>Source Files\Utils</Filter>
+    <ClCompile Include="Protections\FileIo.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\FilePolicy.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\FileScan.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Quarantine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\StubEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

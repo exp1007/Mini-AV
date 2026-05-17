@@ -1,9 +1,21 @@
 #include "Protections.h"
-#include "../Globals.h"
+
 #include "../Config.h"
+#include "../Globals.h"
 #include "../Utils/Utils.h"
+#include "FileScan.h"
 
 #include <thread>
+
+void Protections::Initialize()
+{
+	InitializeFileScan();
+}
+
+void Protections::Shutdown()
+{
+	ShutdownFileScan();
+}
 
 void Protections::Manager() {
 	while (Globals::AppIsRunning) {

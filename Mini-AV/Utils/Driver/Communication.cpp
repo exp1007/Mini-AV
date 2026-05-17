@@ -1,15 +1,22 @@
 #include "Communication.h"
 
+#include "../../Alerts/Alerts.h"
 #include "../../Logging/Logging.h"
-#include "../Scanner/Scanner.h"
+#include "../../Protections/Protections.h"
+#include "../../Protections/Quarantine.h"
 #include "MiniAvFilterMessages.h"
 
 #include <Windows.h>
+
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstring>
 #include <cwchar>
+#include <mutex>
+#include <string>
 #include <thread>
+#include <unordered_set>
 
 #include <fltuser.h>
 
@@ -41,45 +48,41 @@ typedef struct _MiniAvReplyBundle {
 static_assert(offsetof(MiniAvReplyBundle, body) == MINIAV_FILTER_REPLY_HEADER_WIRE_BYTES, "reply body offset");
 static_assert(sizeof(MiniAvReplyBundle) == MINIAV_FILTER_REPLY_HEADER_WIRE_BYTES + sizeof(MINIAV_CREATE_DECISION_REPLY), "reply bundle size");
 
-static bool PathContainsInsensitive(const WCHAR* path, const WCHAR* needle)
+static void SetDenyReply(MINIAV_CREATE_DECISION_REPLY* outReply)
 {
-	if (!path || !needle) {
-		return false;
-	}
-
-	const size_t n = wcslen(needle);
-	if (n == 0) {
-		return false;
-	}
-
-	for (const WCHAR* p = path; *p != L'\0'; ++p) {
-		if (_wcsnicmp(p, needle, n) == 0) {
-			return true;
-		}
-	}
-
-	return false;
+	outReply->Verdict = MiniAvVerdictDeny;
+	outReply->NtStatusIfDeny = static_cast<LONG>(0xC0000022L);
 }
 
-static const WCHAR kBlockTestExe[] = L"MiniAvBlockTest.exe";
-
-static bool PolicyShouldDenyCreate(const MINIAV_CREATE_DECISION_REQUEST* req)
+static std::wstring ToLowerPath(std::wstring Value)
 {
-	if (!req || req->PathLengthChars == 0 || req->Path[0] == L'\0') {
-		return false;
-	}
+	std::transform(Value.begin(), Value.end(), Value.begin(), [](wchar_t Ch) {
+		return static_cast<wchar_t>(towlower(Ch));
+	});
+	return Value;
+}
 
-	const WCHAR* path = req->Path;
-	const WCHAR* slash = wcsrchr(path, L'\\');
-	const WCHAR* fname = slash ? (slash + 1) : path;
-	const WCHAR* colon = wcschr(fname, L':');
-	const size_t fnameLen = colon ? static_cast<size_t>(colon - fname) : wcslen(fname);
-	const size_t blockLen = wcslen(kBlockTestExe);
-	if (fnameLen == blockLen && _wcsnicmp(fname, kBlockTestExe, blockLen) == 0) {
+static bool ShouldLogBlock(const std::wstring& ResolvedPath)
+{
+	static std::mutex mutex;
+	static std::unordered_set<std::wstring> recent;
+	static constexpr size_t kMaxRecent = 256;
+
+	if (ResolvedPath.empty()) {
 		return true;
 	}
 
-	return PathContainsInsensitive(path, kBlockTestExe);
+	const std::wstring key = ToLowerPath(ResolvedPath);
+	std::lock_guard<std::mutex> lock(mutex);
+	if (recent.find(key) != recent.end()) {
+		return false;
+	}
+
+	if (recent.size() >= kMaxRecent) {
+		recent.erase(recent.begin());
+	}
+	recent.insert(key);
+	return true;
 }
 
 static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINIAV_CREATE_DECISION_REPLY* outReply)
@@ -89,9 +92,62 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 	outReply->Verdict = MiniAvVerdictAllow;
 	outReply->NtStatusIfDeny = 0;
 
-	if (PolicyShouldDenyCreate(req)) {
-		outReply->Verdict = MiniAvVerdictDeny;
-		outReply->NtStatusIfDeny = static_cast<LONG>(0xC0000022L);
+	if (!req) {
+		return;
+	}
+
+	const Protections::ExecutionScanResult result = Protections::EvaluateExecutionCreate(*req);
+
+	switch (result.Verdict) {
+	case Protections::ScanVerdict::Block: {
+		const bool logBlock = ShouldLogBlock(result.ResolvedPath);
+		if (logBlock && result.ApplyQuarantine) {
+			std::wstring quarantinePath;
+			if (!result.ResolvedPath.empty()) {
+				if (!Quarantine::MoveToQuarantine(result.ResolvedPath, quarantinePath)) {
+					LOG_ERROR(
+						"Mini-AV filter: quarantine failed for %ls (%s)",
+						result.ResolvedPath.c_str(),
+						result.Reason.c_str());
+				}
+			}
+		}
+		SetDenyReply(outReply);
+		if (logBlock) {
+			LOG_WARNING(
+				"Mini-AV filter: DENY (block) pid=%lu subtype=%lu path=%ls reason=%s",
+				req->ProcessId,
+				req->OperationSubtype,
+				(req->Path[0] != L'\0') ? req->Path : L"(empty)",
+				result.Reason.c_str());
+			char alertPath[MAX_PATH * 2]{};
+			if (!result.ResolvedPath.empty()) {
+				(void)WideCharToMultiByte(
+					CP_UTF8,
+					0,
+					result.ResolvedPath.c_str(),
+					-1,
+					alertPath,
+					static_cast<int>(sizeof(alertPath)),
+					nullptr,
+					nullptr);
+			}
+			Alerts::Add(std::string("Execution blocked: ") + (alertPath[0] ? alertPath : "(unknown)"), AlertRisk::high);
+		}
+		break;
+	}
+	case Protections::ScanVerdict::Error:
+		SetDenyReply(outReply);
+		LOG_ERROR(
+			"Mini-AV filter: DENY (fail-closed) pid=%lu subtype=%lu path=%ls reason=%s",
+			req->ProcessId,
+			req->OperationSubtype,
+			(req->Path[0] != L'\0') ? req->Path : L"(empty)",
+			result.Reason.c_str());
+		break;
+	case Protections::ScanVerdict::Allow:
+	default:
+		break;
 	}
 }
 
@@ -161,15 +217,29 @@ static void MessagePumpLoop()
 			(req->Version == MINIAV_PROTOCOL_VERSION) &&
 			(req->MessageType == MiniAvMsgCreateDecision);
 
-		if (validCreate) {
-			EvaluateCreatePolicy(req, pBody);
-		} else {
-			LOG_WARNING(
-				"Mini-AV filter: bad create message magic=0x%08lX ver=%lu type=%lu",
-				req->Magic,
-				req->Version,
-				req->MessageType);
+		if (!validCreate) {
+			static DWORD s_lastBadMessageLogMs = 0;
+			const DWORD nowMs = GetTickCount();
+			if ((nowMs - s_lastBadMessageLogMs) > 5000u) {
+				s_lastBadMessageLogMs = nowMs;
+				LOG_WARNING(
+					"Mini-AV filter: ignored non-create message magic=0x%08lX ver=%lu type=%lu",
+					req->Magic,
+					req->Version,
+					req->MessageType);
+			}
+			continue;
 		}
+
+		if (kernelExpectedReply < ourStructBytes) {
+			LOG_ERROR(
+				"Mini-AV filter: reply length %lu too small (need %lu)",
+				kernelExpectedReply,
+				ourStructBytes);
+			continue;
+		}
+
+		EvaluateCreatePolicy(req, pBody);
 
 		const HRESULT replyHr = FilterReplyMessage(g_hPort, prh, sendBytes);
 
@@ -179,17 +249,6 @@ static void MessagePumpLoop()
 				static_cast<unsigned long>(replyHr),
 				kernelExpectedReply,
 				sendBytes);
-			continue;
-		}
-
-		if (validCreate && pBody->Verdict == MiniAvVerdictDeny) {
-			LOG_WARNING(
-				"Mini-AV filter: DENY pid=%lu subtype=%lu access=0x%08lX path=%ls",
-				req->ProcessId,
-				req->OperationSubtype,
-				req->DesiredAccess,
-				(req->Path[0] != L'\0') ? req->Path : L"(empty)");
-			Scanner::EnqueueBlockedFile(*req);
 		}
 	}
 }
@@ -201,6 +260,8 @@ bool Communication::Connect()
 	if (g_hPort != INVALID_HANDLE_VALUE) {
 		return true;
 	}
+
+	Protections::Initialize();
 
 	MINIAV_CONNECT_CONTEXT connectCtx{};
 	connectCtx.Magic = MINIAV_MSG_MAGIC;
@@ -216,10 +277,9 @@ bool Communication::Connect()
 		&g_hPort);
 
 	if (FAILED(hr)) {
+		Protections::Shutdown();
 		return false;
 	}
-
-	Scanner::Start();
 
 	g_workerStop = false;
 	g_worker = std::thread(MessagePumpLoop);
@@ -232,8 +292,6 @@ bool Communication::Connect()
 void Communication::Disconnect()
 {
 	const bool hadPort = (g_hPort != INVALID_HANDLE_VALUE);
-
-	Scanner::Stop();
 
 	g_workerStop = true;
 
@@ -249,6 +307,8 @@ void Communication::Disconnect()
 		CloseHandle(g_hPort);
 		g_hPort = INVALID_HANDLE_VALUE;
 	}
+
+	Protections::Shutdown();
 
 	if (hadPort) {
 		LOG_INFO("Mini-AV filter: port closed");
