@@ -6,9 +6,11 @@
 #include <stdarg.h>
 
 #include <string>
+#include <vector>
 
 namespace Logs {
 	void Add(std::string Data);
+	std::vector<std::string> GetSnapshot();
 }
 
 namespace TerminalLogs {

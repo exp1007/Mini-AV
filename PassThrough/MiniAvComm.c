@@ -34,6 +34,7 @@ C_ASSERT( sizeof( MINIAV_CREATE_DECISION_REQUEST ) == MINIAV_CREATE_DECISION_REQ
 C_ASSERT( sizeof( MINIAV_CREATE_DECISION_REPLY ) == 32 );
 
 static PFLT_PORT gMiniAvClientPort = NULL;
+static ULONG gMiniAvClientPid = 0;
 
 #define MINIAV_DRV_LOG_LEVEL   DPFLTR_WARNING_LEVEL
 #define MINIAV_LOG_DENY        0x00000001ul
@@ -107,13 +108,29 @@ PtMiniAvConnect (
     UNREFERENCED_PARAMETER( ConnectionContext );
     UNREFERENCED_PARAMETER( SizeOfContext );
 
+    PMINIAV_CONNECT_CONTEXT ctx;
+
     PAGED_CODE();
 
     *ConnectionPortCookie = ClientPort;
 
+    gMiniAvClientPid = 0;
+
+    if ((ConnectionContext != NULL) &&
+        (SizeOfContext >= sizeof( MINIAV_CONNECT_CONTEXT ))) {
+
+        ctx = (PMINIAV_CONNECT_CONTEXT)ConnectionContext;
+
+        if ((ctx->Magic == MINIAV_MSG_MAGIC) &&
+            (ctx->Version == MINIAV_PROTOCOL_VERSION)) {
+
+            gMiniAvClientPid = ctx->ClientProcessId;
+        }
+    }
+
     (VOID)InterlockedExchangePointer( (PVOID volatile *)&gMiniAvClientPort, ClientPort );
 
-    MiniAvLog( MINIAV_LOG_DIAG, "port: client connected (%p)\n", ClientPort );
+    MiniAvLog( MINIAV_LOG_DIAG, "port: client connected (%p) pid=%lu\n", ClientPort, gMiniAvClientPid );
 
     return STATUS_SUCCESS;
 }
@@ -127,6 +144,8 @@ PtMiniAvDisconnect (
     PFLT_PORT clientPort = (PFLT_PORT)ConnectionCookie;
 
     PAGED_CODE();
+
+    gMiniAvClientPid = 0;
 
     (VOID)InterlockedExchangePointer( (PVOID volatile *)&gMiniAvClientPort, NULL );
 
@@ -227,6 +246,18 @@ PtPreOperationCreateMiniAv (
         return FLT_PREOP_SUCCESS_WITH_CALLBACK;
     }
 
+    process = FltGetRequestorProcess( Data );
+    if ((process != NULL) && (gMiniAvClientPid != 0)) {
+        ULONG requestorPid = (ULONG)(ULONG_PTR)PsGetProcessId( process );
+
+        if (requestorPid == gMiniAvClientPid) {
+
+            MiniAvLog( MINIAV_LOG_DIAG, "CREATE: self-skip pid=%lu\n", requestorPid );
+            PtPassthroughRequestOpStatusIfNeeded( Data );
+            return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+        }
+    }
+
     clientPort = (PFLT_PORT)InterlockedCompareExchangePointer( (PVOID volatile *)&gMiniAvClientPort,
                                                                NULL,
                                                                NULL );
@@ -256,7 +287,6 @@ PtPreOperationCreateMiniAv (
     req.Version = MINIAV_PROTOCOL_VERSION;
     req.MessageType = MiniAvMsgCreateDecision;
     req.OperationSubtype = PtMiniAvClassifyCreateSubtype( Data );
-    process = FltGetRequestorProcess( Data );
     if (process != NULL) {
         req.ProcessId = (ULONG)(ULONG_PTR)PsGetProcessId( process );
     }

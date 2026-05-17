@@ -14,6 +14,9 @@ struct ProcEntity {
 namespace Globals {
 	inline WINDOWINFO WindowInfo;
 	inline ImVec2 ClientSize;
+	inline float TitleBarHeight = 36.0f;
+	inline HWND MainWindowHandle = nullptr;
+	inline RECT TitleBarDragRect = {};
 
 	inline std::vector<std::string> Logs;
 	inline std::vector<AlertEntity> Alerts;

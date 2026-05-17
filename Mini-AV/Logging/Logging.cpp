@@ -3,68 +3,102 @@
 
 #include <chrono>
 #include <ctime>
+#include <mutex>
 
-void Logs::Add(std::string Data) {
-    auto Now = std::chrono::system_clock::now();
-    std::time_t NowC = std::chrono::system_clock::to_time_t(Now);
-    char TimeBuffer[32];
-    std::strftime(TimeBuffer, sizeof(TimeBuffer), "[%Y-%m-%d %H:%M:%S] ", std::localtime(&NowC));
-    std::string FormattedString = std::string(TimeBuffer) + Data;
+namespace {
 
-    Globals::Logs.push_back(FormattedString);
+std::mutex UiLogsMutex;
+
+}
+
+void Logs::Add(std::string Data)
+{
+	auto Now = std::chrono::system_clock::now();
+	const std::time_t NowC = std::chrono::system_clock::to_time_t(Now);
+	char TimeBuffer[32];
+	std::strftime(TimeBuffer, sizeof(TimeBuffer), "[%Y-%m-%d %H:%M:%S] ", std::localtime(&NowC));
+	const std::string FormattedString = std::string(TimeBuffer) + Data;
+
+	std::lock_guard<std::mutex> Lock(UiLogsMutex);
+	Globals::Logs.push_back(FormattedString);
+}
+
+std::vector<std::string> Logs::GetSnapshot()
+{
+	std::lock_guard<std::mutex> Lock(UiLogsMutex);
+	return Globals::Logs;
 }
 
 namespace TerminalLogs {
-    static bool IsInitialized = false;
 
-    void Initialize() {
-        if (IsInitialized) return;
+static std::mutex LogMutex;
+static bool IsInitialized = false;
 
-        AllocConsole();
-        SetConsoleTitleA( "Mini-AV Console" );
-        freopen_s( reinterpret_cast<FILE**>( stdout ), "CONOUT$", "w", stdout );
-        freopen_s( reinterpret_cast<FILE**>( stderr ), "CONOUT$", "w", stderr );
-        freopen_s( reinterpret_cast<FILE**>( stdin ), "CONIN$", "r", stdin );
+void Initialize()
+{
+	std::lock_guard<std::mutex> Lock(LogMutex);
+	if (IsInitialized) {
+		return;
+	}
 
-        IsInitialized = true;
-    }
+	AllocConsole();
+	SetConsoleTitleA("Mini-AV Console");
+	freopen_s(reinterpret_cast<FILE**>(stdout), "CONOUT$", "w", stdout);
+	freopen_s(reinterpret_cast<FILE**>(stderr), "CONOUT$", "w", stderr);
+	freopen_s(reinterpret_cast<FILE**>(stdin), "CONIN$", "r", stdin);
 
-    void Shutdown() {
-        if (!IsInitialized) return;
+	IsInitialized = true;
+}
 
-        PostMessageA( GetConsoleWindow( ), WM_CLOSE, 0, 0 );
-        FreeConsole();
+void Shutdown()
+{
+	std::lock_guard<std::mutex> Lock(LogMutex);
+	if (!IsInitialized) {
+		return;
+	}
 
-        IsInitialized = false;
-    }
+	PostMessageA(GetConsoleWindow(), WM_CLOSE, 0, 0);
+	FreeConsole();
 
-    void Log( const char* File, int Line, WORD Color, const char* Fmt, ... ) {
-        if (!IsInitialized) return;
+	IsInitialized = false;
+}
 
-        SYSTEMTIME Time;
-        GetLocalTime( &Time );
+void Log(const char* File, int Line, WORD Color, const char* Fmt, ...)
+{
+	std::lock_guard<std::mutex> Lock(LogMutex);
+	if (!IsInitialized) {
+		return;
+	}
 
-        HANDLE HConsole = GetStdHandle( STD_OUTPUT_HANDLE );
-        CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
-        GetConsoleScreenBufferInfo( HConsole, &ConsoleInfo );
-        WORD OriginalAttrs = ConsoleInfo.wAttributes;
+	SYSTEMTIME Time;
+	GetLocalTime(&Time);
 
-        printf( "[%02d:%02d:%02d] ", Time.wHour, Time.wMinute, Time.wSecond );
+	HANDLE HConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
+	GetConsoleScreenBufferInfo(HConsole, &ConsoleInfo);
+	const WORD OriginalAttrs = ConsoleInfo.wAttributes;
 
-        const char* FileName = strrchr( File, '\\' );
-        FileName = FileName ? FileName + 1 : File;
+	const char* FileName = strrchr(File, '\\');
+	FileName = FileName ? FileName + 1 : File;
 
-        SetConsoleTextAttribute( HConsole, Color );
-        printf( "%s:%d:", FileName, Line );
+	char Message[2048]{};
+	va_list Args;
+	va_start(Args, Fmt);
+	const int MessageLen = vsnprintf(Message, sizeof(Message), Fmt, Args);
+	va_end(Args);
 
-        SetConsoleTextAttribute( HConsole, OriginalAttrs );
-        printf( " " );
+	printf("[%02d:%02d:%02d] ", Time.wHour, Time.wMinute, Time.wSecond);
 
-        va_list Args;
-        va_start( Args, Fmt );
-        vprintf( Fmt, Args );
-        va_end( Args );
-        
-        printf( "\n" );
-    }
+	SetConsoleTextAttribute(HConsole, Color);
+	printf("%s:%d:", FileName, Line);
+	SetConsoleTextAttribute(HConsole, OriginalAttrs);
+	printf(" ");
+
+	if (MessageLen >= 0) {
+		printf("%s", Message);
+	}
+	printf("\n");
+	fflush(stdout);
+}
+
 }

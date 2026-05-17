@@ -156,10 +156,14 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Logging\Logging.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Utils\Communication\Communication.cpp" />
+    <ClCompile Include="Utils\Driver\Communication.cpp" />
+    <ClCompile Include="Utils\Driver\Setup.cpp" />
+    <ClCompile Include="Utils\Scanner\Scanner.cpp" />
     <ClCompile Include="Protections\Handles.cpp" />
     <ClCompile Include="Protections\Protections.cpp" />
     <ClCompile Include="UI\Components\MainWindow.cpp" />
+    <ClCompile Include="UI\Components\StartupWindow.cpp" />
+    <ClCompile Include="UI\Components\TitleBar.cpp" />
     <ClCompile Include="UI\ImGui\imgui.cpp" />
     <ClCompile Include="UI\ImGui\imgui_demo.cpp" />
     <ClCompile Include="UI\ImGui\imgui_draw.cpp" />
@@ -187,7 +191,8 @@
     <ClInclude Include="UI\ImGui\imstb_textedit.h" />
     <ClInclude Include="UI\ImGui\imstb_truetype.h" />
     <ClInclude Include="UI\UI.h" />
-    <ClInclude Include="Utils\Communication\Communication.h" />
+    <ClInclude Include="Utils\Driver\Communication.h" />
+    <ClInclude Include="Utils\Driver\Setup.h" />
     <ClInclude Include="Utils\Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -45,6 +45,12 @@ typedef struct _MINIAV_PING_REPLY {
     long          NtStatus;
 } MINIAV_PING_REPLY, *PMINIAV_PING_REPLY;
 
+typedef struct _MINIAV_CONNECT_CONTEXT {
+    unsigned long Magic;
+    unsigned long Version;
+    unsigned long ClientProcessId;
+} MINIAV_CONNECT_CONTEXT, *PMINIAV_CONNECT_CONTEXT;
+
 typedef struct _MINIAV_CREATE_DECISION_REQUEST {
     unsigned long Magic;
     unsigned long Version;

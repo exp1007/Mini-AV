@@ -14,35 +14,12 @@ void UI::Components::MainWindow() {
 
 	ImGuiStyle& Style = ImGui::GetStyle();
 
-	ImGui::SetNextWindowPos({0,0}, ImGuiCond_Always);
+	ImGui::SetNextWindowPos({ 0,0 }, ImGuiCond_Always);
 	ImGui::SetNextWindowSize(Globals::ClientSize);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 
-	ImGui::Begin("Main window", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoResize);
-
-	if (ImGui::BeginMenuBar()) {
-		if (ImGui::BeginMenu("View")) {
-			if (ImGui::MenuItem("Alerts", NULL, &Config::Data.ViewAlerts)) Config::SaveConfig();
-			if (ImGui::MenuItem("Logs", NULL, &Config::Data.ViewLogs)) Config::SaveConfig();
-			if (ImGui::MenuItem("Console Logs", NULL, &Config::Data.ViewConsoleLogs)) {
-				if (Config::Data.ViewConsoleLogs)
-					TerminalLogs::Initialize();
-				else
-					TerminalLogs::Shutdown();
-
-				Config::SaveConfig();
-			}
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("UI Framework")) {
-			if (ImGui::MenuItem("Demo window", NULL, &Config::Data.DebugWindow)) Config::SaveConfig();
-			if (ImGui::MenuItem("Styles window", NULL, &Config::Data.StylesWindow)) Config::SaveConfig();
-			ImGui::EndMenu();
-		}
-
-		ImGui::EndMenuBar();
-	}
+	ImGui::Begin("Main window", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+	UI::Components::TitleBar();
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + Style.WindowPadding.x - Style.ItemSpacing.y);
 
 	// Childs
 	ImVec2 ChildSize = ImGui::GetWindowSize();
@@ -111,7 +88,31 @@ void UI::Components::MainWindow() {
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Style.WindowPadding.x, Style.ItemSpacing.y });
 	ImGui::SameLine();
 
-	if (ImGui::BeginChild("Second child", { ChildSize.x,0 }, ImGuiChildFlags_Border)) {
+	if (ImGui::BeginChild("Second child", { ChildSize.x,0 }, ImGuiChildFlags_Border, ImGuiWindowFlags_MenuBar)) {
+
+		if (ImGui::BeginMenuBar()) {
+			if (ImGui::BeginMenu("View")) {
+				if (ImGui::MenuItem("Alerts", NULL, &Config::Data.ViewAlerts)) Config::SaveConfig();
+				if (ImGui::MenuItem("Logs", NULL, &Config::Data.ViewLogs)) Config::SaveConfig();
+				if (ImGui::MenuItem("Console Logs", NULL, &Config::Data.ViewConsoleLogs)) {
+					if (Config::Data.ViewConsoleLogs)
+						TerminalLogs::Initialize();
+					else
+						TerminalLogs::Shutdown();
+
+					Config::SaveConfig();
+				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("UI Framework")) {
+				if (ImGui::MenuItem("Demo window", NULL, &Config::Data.DebugWindow)) Config::SaveConfig();
+				if (ImGui::MenuItem("Styles window", NULL, &Config::Data.StylesWindow)) Config::SaveConfig();
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenuBar();
+		}
 
 		// Alerts terminal
 		if (Config::Data.ViewAlerts) {
@@ -137,11 +138,13 @@ void UI::Components::MainWindow() {
 
 			ImGui::BeginChild("Logs terminal", { 0,200 }, ImGuiChildFlags_FrameStyle);
 
+			const std::vector<std::string> UiLogs = Logs::GetSnapshot();
+
 			ImGuiListClipper clipper;
-			clipper.Begin(Globals::Logs.size());
+			clipper.Begin(UiLogs.size());
 			while (clipper.Step())
 				for (int line_no = clipper.DisplayStart; line_no < clipper.DisplayEnd; line_no++)
-					ImGui::Text(Globals::Logs[line_no].c_str());
+					ImGui::Text(UiLogs[line_no].c_str());
 			
 			ImGui::EndChild();
 			ImGui::PopStyleVar();
@@ -152,7 +155,4 @@ void UI::Components::MainWindow() {
 	ImGui::PopStyleVar();
 
 	ImGui::End();
-
-	// Cleaning pushes
-	ImGui::PopStyleVar();
 }

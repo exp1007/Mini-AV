@@ -19,5 +19,6 @@ namespace Config {
 	inline CFGType Data;
 
 	void SaveConfig();
-	void LoadConfig();
+	bool LoadConfig();
+	bool HasConfigFile();
 }

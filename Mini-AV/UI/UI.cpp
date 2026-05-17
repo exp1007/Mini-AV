@@ -1,5 +1,6 @@
 #include "UI.h"
 #include "Globals.h"
+#include "Font-Logo.h"
 #include "../Config.h"
 
 #include "imgui.h"
@@ -8,6 +9,10 @@
 
 #include <d3d9.h>
 #include <tchar.h>
+#include <dwmapi.h>
+#include <windowsx.h>
+
+#pragma comment(lib, "dwmapi.lib")
 
 
 // Data
@@ -22,12 +27,19 @@ void CleanupDeviceD3D();
 void ResetDevice();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-int UI::Run()
+int UI::Run(UI::StartupState StartupDetails)
 {
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Anti-tamper", nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Anti-tamper", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Anti-tamper", WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+    Globals::MainWindowHandle = hwnd;
+
+    LONG ExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+    SetWindowLong(hwnd, GWL_EXSTYLE, ExStyle | WS_EX_APPWINDOW);
+
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+        SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER);
 
     if (!CreateDeviceD3D(hwnd))
     {
@@ -60,21 +72,25 @@ int UI::Run()
     Style.FramePadding = { 12,4 };
     Style.GrabMinSize = 5;
     Style.SeparatorTextBorderSize = 1;
+    Style.FrameBorderSize = 1;
 
     Style.WindowShadowSize = 38;
     Style.WindowShadowOffsetAngle = 0;
 
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX9_Init(g_pd3dDevice);
+    ImGui_ImplWin32_EnableAlphaCompositing(hwnd);
 
     // Load Fonts
     io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\arial.ttf", 15.0f);
+    UI::FontLogo = io.Fonts->AddFontFromMemoryTTF(FontLogoRawData, sizeof(FontLogoRawData), 22.0f);
 
     // Our state
-    ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 1.00f);
+    ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 0.00f);
 
     // Main loop
     bool done = false;
+    bool IsStartupComplete = false;
     while (!done)
     {
         MSG msg;
@@ -85,8 +101,6 @@ int UI::Run()
             if (msg.message == WM_QUIT)
                 done = true;
 
-            if (msg.message == WM_SIZE)
-                printf("a");
         }
         if (done)
             break;
@@ -116,11 +130,15 @@ int UI::Run()
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        GetWindowInfo(hwnd, &Globals::WindowInfo);
-        Globals::ClientSize.x = Globals::WindowInfo.rcClient.right - Globals::WindowInfo.rcClient.left;
-        Globals::ClientSize.y = Globals::WindowInfo.rcClient.bottom - Globals::WindowInfo.rcClient.top;
+        RECT ClientRect{};
+        GetClientRect(hwnd, &ClientRect);
+        Globals::ClientSize.x = static_cast<float>(ClientRect.right - ClientRect.left);
+        Globals::ClientSize.y = static_cast<float>(ClientRect.bottom - ClientRect.top);
 
-        UI::Components::MainWindow();
+        if (!IsStartupComplete)
+            IsStartupComplete = UI::Components::StartupWindow(StartupDetails);
+        else
+            UI::Components::MainWindow();
 
         if (Config::Data.DebugWindow)
             ImGui::ShowDemoWindow(&Config::Data.DebugWindow);
@@ -168,7 +186,7 @@ bool CreateDeviceD3D(HWND hWnd)
     ZeroMemory(&g_d3dpp, sizeof(g_d3dpp));
     g_d3dpp.Windowed = TRUE;
     g_d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-    g_d3dpp.BackBufferFormat = D3DFMT_UNKNOWN; // Need to use an explicit format with alpha if needing per-pixel alpha composition.
+    g_d3dpp.BackBufferFormat = D3DFMT_A8R8G8B8;
     g_d3dpp.EnableAutoDepthStencil = TRUE;
     g_d3dpp.AutoDepthStencilFormat = D3DFMT_D16;
     g_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;           // Present with vsync
@@ -203,6 +221,10 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg)
     {
+    case WM_NCCALCSIZE:
+        if (wParam == TRUE)
+            return 0;
+        break;
     case WM_SIZE:
         if (wParam == SIZE_MINIMIZED)
             return 0;
@@ -216,6 +238,45 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
         ::PostQuitMessage(0);
         return 0;
+    case WM_NCHITTEST:
+    {
+        const LONG Border = 8;
+        RECT Rect;
+        GetWindowRect(hWnd, &Rect);
+        const LONG X = GET_X_LPARAM(lParam);
+        const LONG Y = GET_Y_LPARAM(lParam);
+
+        const bool IsMaximized = IsZoomed(hWnd);
+
+        const bool OnLeft = !IsMaximized && X >= Rect.left && X < Rect.left + Border;
+        const bool OnRight = !IsMaximized && X < Rect.right && X >= Rect.right - Border;
+        const bool OnTop = !IsMaximized && Y >= Rect.top && Y < Rect.top + Border;
+        const bool OnBottom = !IsMaximized && Y < Rect.bottom && Y >= Rect.bottom - Border;
+
+        if (OnTop && OnLeft)
+            return HTTOPLEFT;
+        if (OnTop && OnRight)
+            return HTTOPRIGHT;
+        if (OnBottom && OnLeft)
+            return HTBOTTOMLEFT;
+        if (OnBottom && OnRight)
+            return HTBOTTOMRIGHT;
+        if (OnLeft)
+            return HTLEFT;
+        if (OnRight)
+            return HTRIGHT;
+        if (OnTop)
+            return HTTOP;
+        if (OnBottom)
+            return HTBOTTOM;
+
+        POINT Pt = { X, Y };
+        ScreenToClient(hWnd, &Pt);
+        if (PtInRect(&Globals::TitleBarDragRect, Pt))
+            return HTCAPTION;
+
+        return HTCLIENT;
+    }
     }
     return ::DefWindowProcW(hWnd, msg, wParam, lParam);
 }

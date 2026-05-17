@@ -406,3 +406,4 @@ FodyWeavers.xsd
 *.zip
 *.cfg
 .cursor/
+CODEBASE_ANALYSIS.md

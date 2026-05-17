@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -66,6 +66,12 @@
     <ClCompile Include="UI\Components\MainWindow.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
+    <ClCompile Include="UI\Components\StartupWindow.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Components\TitleBar.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
     <ClCompile Include="Utils\Utils.cpp">
       <Filter>Source Files\Utils</Filter>
     </ClCompile>
@@ -84,8 +90,14 @@
     <ClCompile Include="Protections\Protections.cpp">
       <Filter>Source Files\Protections</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\Communication\Communication.cpp">
+    <ClCompile Include="Utils\Driver\Communication.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Driver\Setup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils\Scanner\Scanner.cpp">
+      <Filter>Source Files\Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -140,7 +152,10 @@
     <ClInclude Include="Shared\MiniAvFilterMessages.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\Communication\Communication.h">
+    <ClInclude Include="Utils\Driver\Communication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Driver\Setup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,6 +1,7 @@
 #include "Communication.h"
 
 #include "../../Logging/Logging.h"
+#include "../Scanner/Scanner.h"
 #include "MiniAvFilterMessages.h"
 
 #include <Windows.h>
@@ -188,6 +189,7 @@ static void MessagePumpLoop()
 				req->OperationSubtype,
 				req->DesiredAccess,
 				(req->Path[0] != L'\0') ? req->Path : L"(empty)");
+			Scanner::EnqueueBlockedFile(*req);
 		}
 	}
 }
@@ -200,11 +202,24 @@ bool Communication::Connect()
 		return true;
 	}
 
-	HRESULT hr = FilterConnectCommunicationPort(MINIAV_PORT_NAME, 0, nullptr, 0, nullptr, &g_hPort);
+	MINIAV_CONNECT_CONTEXT connectCtx{};
+	connectCtx.Magic = MINIAV_MSG_MAGIC;
+	connectCtx.Version = MINIAV_PROTOCOL_VERSION;
+	connectCtx.ClientProcessId = GetCurrentProcessId();
+
+	HRESULT hr = FilterConnectCommunicationPort(
+		MINIAV_PORT_NAME,
+		0,
+		&connectCtx,
+		static_cast<WORD>(sizeof(connectCtx)),
+		nullptr,
+		&g_hPort);
 
 	if (FAILED(hr)) {
 		return false;
 	}
+
+	Scanner::Start();
 
 	g_workerStop = false;
 	g_worker = std::thread(MessagePumpLoop);
@@ -217,6 +232,8 @@ bool Communication::Connect()
 void Communication::Disconnect()
 {
 	const bool hadPort = (g_hPort != INVALID_HANDLE_VALUE);
+
+	Scanner::Stop();
 
 	g_workerStop = true;
 

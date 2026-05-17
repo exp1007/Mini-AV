@@ -6,6 +6,11 @@
 using json = nlohmann::json;
 
 namespace Config {
+    bool HasConfigFile() {
+        std::ifstream file("settings.cfg");
+        return file.good();
+    }
+
     void SaveConfig() {
         json j;
 
@@ -22,11 +27,16 @@ namespace Config {
         file.close();
     }
 
-    void LoadConfig() {
+    bool LoadConfig() {
         std::ifstream file("settings.cfg");
-        if (!file.is_open()) return;
+        if (!file.is_open())
+            return false;
         json j;
-        file >> j;
+        try {
+            file >> j;
+        } catch (...) {
+            return false;
+        }
 
         Data.DebugWindow = j.value("DebugWindow", Data.DebugWindow);
         Data.StylesWindow = j.value("StylesWindow", Data.StylesWindow);
@@ -44,5 +54,7 @@ namespace Config {
         } else {
             TerminalLogs::Shutdown();
         }
+
+        return true;
     }
 }
