@@ -54,35 +54,18 @@ static void SetDenyReply(MINIAV_CREATE_DECISION_REPLY* outReply)
 	outReply->NtStatusIfDeny = static_cast<LONG>(0xC0000022L);
 }
 
-static std::wstring ToLowerPath(std::wstring Value)
+static std::string PathToUtf8(const std::wstring& Path)
 {
-	std::transform(Value.begin(), Value.end(), Value.begin(), [](wchar_t Ch) {
-		return static_cast<wchar_t>(towlower(Ch));
-	});
-	return Value;
-}
-
-static bool ShouldLogBlock(const std::wstring& ResolvedPath)
-{
-	static std::mutex mutex;
-	static std::unordered_set<std::wstring> recent;
-	static constexpr size_t kMaxRecent = 256;
-
-	if (ResolvedPath.empty()) {
-		return true;
+	if (Path.empty()) {
+		return std::string("(unknown)");
 	}
-
-	const std::wstring key = ToLowerPath(ResolvedPath);
-	std::lock_guard<std::mutex> lock(mutex);
-	if (recent.find(key) != recent.end()) {
-		return false;
+	const int needed = WideCharToMultiByte(CP_UTF8, 0, Path.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	if (needed <= 1) {
+		return std::string("(unknown)");
 	}
-
-	if (recent.size() >= kMaxRecent) {
-		recent.erase(recent.begin());
-	}
-	recent.insert(key);
-	return true;
+	std::string out(static_cast<size_t>(needed - 1), '\0');
+	WideCharToMultiByte(CP_UTF8, 0, Path.c_str(), -1, out.data(), needed, nullptr, nullptr);
+	return out;
 }
 
 static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINIAV_CREATE_DECISION_REPLY* outReply)
@@ -98,55 +81,83 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 
 	const Protections::ExecutionScanResult result = Protections::EvaluateExecutionCreate(*req);
 
+	const wchar_t* const reqPath = (req->Path[0] != L'\0') ? req->Path : L"(empty)";
+	const std::string reason = result.Reason.empty() ? std::string("(no reason)") : result.Reason;
+
+	// Every action taken (block / deny / dangerous / suspicious) is reported every
+	// time it happens — no per-path de-dup — so the user always sees what occurred.
 	switch (result.Verdict) {
 	case Protections::ScanVerdict::Block: {
-		const bool logBlock = ShouldLogBlock(result.ResolvedPath);
-		if (logBlock && result.ApplyQuarantine) {
+		if (result.ApplyQuarantine && !result.ResolvedPath.empty()) {
 			std::wstring quarantinePath;
-			if (!result.ResolvedPath.empty()) {
-				if (!Quarantine::MoveToQuarantine(result.ResolvedPath, quarantinePath)) {
-					LOG_ERROR(
-						"Mini-AV filter: quarantine failed for %ls (%s)",
-						result.ResolvedPath.c_str(),
-						result.Reason.c_str());
-				}
+			if (!Quarantine::MoveToQuarantine(result.ResolvedPath, quarantinePath)) {
+				LOG_ERROR(
+					"Mini-AV filter: quarantine failed for %ls (%s)",
+					result.ResolvedPath.c_str(),
+					result.Reason.c_str());
 			}
 		}
 		SetDenyReply(outReply);
-		if (logBlock) {
-			LOG_WARNING(
-				"Mini-AV filter: DENY (block) pid=%lu subtype=%lu path=%ls reason=%s",
-				req->ProcessId,
-				req->OperationSubtype,
-				(req->Path[0] != L'\0') ? req->Path : L"(empty)",
-				result.Reason.c_str());
-			char alertPath[MAX_PATH * 2]{};
-			if (!result.ResolvedPath.empty()) {
-				(void)WideCharToMultiByte(
-					CP_UTF8,
-					0,
-					result.ResolvedPath.c_str(),
-					-1,
-					alertPath,
-					static_cast<int>(sizeof(alertPath)),
-					nullptr,
-					nullptr);
-			}
-			Alerts::Add(std::string("Execution blocked: ") + (alertPath[0] ? alertPath : "(unknown)"), AlertRisk::high);
-		}
+		LOG_WARNING(
+			"Mini-AV filter: DENY (block) score=%d pid=%lu subtype=%lu path=%ls reason=%s",
+			result.Score,
+			req->ProcessId,
+			req->OperationSubtype,
+			reqPath,
+			reason.c_str());
+		Alerts::Add(
+			"Execution blocked: " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+			AlertRisk::high,
+			"",
+			result.Category.empty() ? "Malicious file" : result.Category);
 		break;
 	}
-	case Protections::ScanVerdict::Error:
+	case Protections::ScanVerdict::Error: {
 		SetDenyReply(outReply);
 		LOG_ERROR(
 			"Mini-AV filter: DENY (fail-closed) pid=%lu subtype=%lu path=%ls reason=%s",
 			req->ProcessId,
 			req->OperationSubtype,
-			(req->Path[0] != L'\0') ? req->Path : L"(empty)",
-			result.Reason.c_str());
+			reqPath,
+			reason.c_str());
+		Alerts::Add(
+			"Access denied (scan error): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+			AlertRisk::medium,
+			"",
+			result.Category.empty() ? "Scan error" : result.Category);
 		break;
+	}
 	case Protections::ScanVerdict::Allow:
 	default:
+		// Allowed but flagged by the heuristic score. Surfaced without blocking so
+		// the user sees what was let through and why. Two severities:
+		//   dangerous (50-59) -> Warning toast ("could be a dangerous program")
+		//   suspicious (30-49) -> low-key Notice toast
+		if (result.Dangerous) {
+			LOG_WARNING(
+				"Mini-AV filter: ALLOW (dangerous score=%d) pid=%lu path=%ls reason=%s",
+				result.Score,
+				req->ProcessId,
+				reqPath,
+				reason.c_str());
+			Alerts::Add(
+				"Potentially dangerous (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+				AlertRisk::medium,
+				"",
+				result.Category.empty() ? "Potentially dangerous" : result.Category);
+		} else if (result.Suspicious) {
+			LOG_INFO(
+				"Mini-AV filter: ALLOW (suspicious score=%d) pid=%lu path=%ls reason=%s",
+				result.Score,
+				req->ProcessId,
+				reqPath,
+				reason.c_str());
+			Alerts::Add(
+				"Suspicious (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+				AlertRisk::low,
+				"",
+				result.Category.empty() ? "Suspicious file" : result.Category);
+		}
 		break;
 	}
 }

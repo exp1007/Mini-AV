@@ -17,6 +17,7 @@ namespace Globals {
 	inline float TitleBarHeight = 36.0f;
 	inline HWND MainWindowHandle = nullptr;
 	inline RECT TitleBarDragRect = {};
+	inline bool TitleBarHovered = false; // True only when the title bar is the top-most window under the cursor.
 
 	inline std::vector<std::string> Logs;
 	inline std::vector<AlertEntity> Alerts;

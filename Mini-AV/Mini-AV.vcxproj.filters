@@ -72,6 +72,15 @@
     <ClCompile Include="UI\Components\TitleBar.cpp">
       <Filter>Source Files\UI</Filter>
     </ClCompile>
+    <ClCompile Include="UI\Components\Notifications.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Components\DebugPanel.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Components\NotificationsWindow.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
     <ClCompile Include="Utils\Utils.cpp">
       <Filter>Source Files\Utils</Filter>
     </ClCompile>
@@ -108,7 +117,37 @@
     <ClCompile Include="Protections\Quarantine.cpp">
       <Filter>Source Files\Protections</Filter>
     </ClCompile>
-    <ClCompile Include="Protections\Engines\StubEngine.cpp">
+    <ClCompile Include="Protections\Engines\EnginePipeline.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\HashDatabase.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\HashEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\ScoreEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\ScoreConfig.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\PeImage.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\ContextEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\CapabilityDatabase.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\CapabilityEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\BytePattern.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\AntiDebugEngine.cpp">
       <Filter>Source Files\Protections</Filter>
     </ClCompile>
   </ItemGroup>
@@ -169,6 +208,15 @@
     </ClInclude>
     <ClInclude Include="Utils\Driver\Setup.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Components\Notifications.h">
+      <Filter>Source Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Components\DebugPanel.h">
+      <Filter>Source Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Components\NotificationsWindow.h">
+      <Filter>Source Files\UI</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

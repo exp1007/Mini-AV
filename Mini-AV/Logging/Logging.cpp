@@ -1,6 +1,7 @@
 #include "../Globals.h"
 #include "Logging.h"
 
+#include <atomic>
 #include <chrono>
 #include <ctime>
 #include <mutex>
@@ -32,20 +33,42 @@ std::vector<std::string> Logs::GetSnapshot()
 namespace TerminalLogs {
 
 static std::mutex LogMutex;
-static bool IsInitialized = false;
+// Atomic so Log() can bail without touching LogMutex once logging is disabled —
+// this also shrinks the window in which a writer can be mid-console-write.
+static std::atomic<bool> IsInitialized{ false };
 
 void Initialize()
 {
 	std::lock_guard<std::mutex> Lock(LogMutex);
-	if (IsInitialized) {
+	if (IsInitialized.load()) {
 		return;
 	}
 
-	AllocConsole();
+	if (!AllocConsole()) {
+		return;
+	}
+
 	SetConsoleTitleA("Mini-AV Console");
-	freopen_s(reinterpret_cast<FILE**>(stdout), "CONOUT$", "w", stdout);
-	freopen_s(reinterpret_cast<FILE**>(stderr), "CONOUT$", "w", stderr);
-	freopen_s(reinterpret_cast<FILE**>(stdin), "CONIN$", "r", stdin);
+
+	// Disable QuickEdit mode. With it on (the console default), a stray click or
+	// text selection in the window pauses ALL console output — which would block a
+	// worker thread inside printf while it holds LogMutex, deadlocking Shutdown()
+	// on the UI thread and hanging the whole app. ENABLE_QUICK_EDIT_MODE only takes
+	// effect alongside ENABLE_EXTENDED_FLAGS.
+	const HANDLE HInput = GetStdHandle(STD_INPUT_HANDLE);
+	if (HInput != INVALID_HANDLE_VALUE && HInput != nullptr) {
+		DWORD InputMode = 0;
+		if (GetConsoleMode(HInput, &InputMode)) {
+			InputMode &= ~ENABLE_QUICK_EDIT_MODE;
+			InputMode |= ENABLE_EXTENDED_FLAGS;
+			SetConsoleMode(HInput, InputMode);
+		}
+	}
+
+	FILE* Stream = nullptr;
+	freopen_s(&Stream, "CONOUT$", "w", stdout);
+	freopen_s(&Stream, "CONOUT$", "w", stderr);
+	freopen_s(&Stream, "CONIN$", "r", stdin);
 
 	IsInitialized = true;
 }
@@ -57,7 +80,11 @@ void Shutdown()
 		return;
 	}
 
-	PostMessageA(GetConsoleWindow(), WM_CLOSE, 0, 0);
+	FILE* Stream = nullptr;
+	freopen_s(&Stream, "NUL", "w", stdout);
+	freopen_s(&Stream, "NUL", "w", stderr);
+	freopen_s(&Stream, "NUL", "r", stdin);
+
 	FreeConsole();
 
 	IsInitialized = false;
@@ -65,17 +92,29 @@ void Shutdown()
 
 void Log(const char* File, int Line, WORD Color, const char* Fmt, ...)
 {
+	// Fast path: skip the lock entirely when the console is off.
+	if (!IsInitialized.load()) {
+		return;
+	}
+
 	std::lock_guard<std::mutex> Lock(LogMutex);
-	if (!IsInitialized) {
+	if (!IsInitialized.load()) {
 		return;
 	}
 
 	SYSTEMTIME Time;
 	GetLocalTime(&Time);
 
-	HANDLE HConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
-	GetConsoleScreenBufferInfo(HConsole, &ConsoleInfo);
+	const HANDLE HConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (HConsole == INVALID_HANDLE_VALUE || HConsole == nullptr) {
+		return;
+	}
+
+	CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo{};
+	if (!GetConsoleScreenBufferInfo(HConsole, &ConsoleInfo)) {
+		return;
+	}
+
 	const WORD OriginalAttrs = ConsoleInfo.wAttributes;
 
 	const char* FileName = strrchr(File, '\\');

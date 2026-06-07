@@ -1,6 +1,8 @@
 #include "UI.h"
 #include "Globals.h"
 #include "Font-Logo.h"
+#include "Components/NotificationsWindow.h"
+#include "Components/DebugPanel.h"
 #include "../Config.h"
 
 #include "imgui.h"
@@ -21,6 +23,7 @@ static LPDIRECT3DDEVICE9        g_pd3dDevice = nullptr;
 static bool                     g_DeviceLost = false;
 static UINT                     g_ResizeWidth = 0, g_ResizeHeight = 0;
 static D3DPRESENT_PARAMETERS    g_d3dpp = {};
+static ImGuiContext*            g_MainImGuiContext = nullptr;
 
 bool CreateDeviceD3D(HWND hWnd);
 void CleanupDeviceD3D();
@@ -30,9 +33,9 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 int UI::Run(UI::StartupState StartupDetails)
 {
     //ImGui_ImplWin32_EnableDpiAwareness();
-    WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Anti-tamper", nullptr };
+    WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Mini-AV", nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Anti-tamper", WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Mini-AV", WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
     Globals::MainWindowHandle = hwnd;
 
     LONG ExStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
@@ -53,6 +56,7 @@ int UI::Run(UI::StartupState StartupDetails)
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    g_MainImGuiContext = ImGui::GetCurrentContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
@@ -60,7 +64,7 @@ int UI::Run(UI::StartupState StartupDetails)
 
     // Style
     ImGuiStyle& Style = ImGui::GetStyle();
-    Style.WindowRounding = 5;
+    Style.WindowRounding = 8;
     Style.ChildRounding = 5;
     Style.FrameRounding = 5;
     Style.PopupRounding = 5;
@@ -83,7 +87,12 @@ int UI::Run(UI::StartupState StartupDetails)
 
     // Load Fonts
     io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\arial.ttf", 15.0f);
-    UI::FontLogo = io.Fonts->AddFontFromMemoryTTF(FontLogoRawData, sizeof(FontLogoRawData), 22.0f);
+
+    ImFontConfig LogoFontConfig{};
+    LogoFontConfig.FontDataOwnedByAtlas = false;
+    UI::FontLogo = io.Fonts->AddFontFromMemoryTTF(FontLogoRawData, sizeof(FontLogoRawData), 22.0f, &LogoFontConfig);
+
+    UI::Components::NotificationsWindow::Initialize(GetModuleHandle(nullptr));
 
     // Our state
     ImVec4 clear_color = ImVec4(0.f, 0.f, 0.f, 0.00f);
@@ -126,6 +135,7 @@ int UI::Run(UI::StartupState StartupDetails)
             ResetDevice();
         }
 
+        ImGui::SetCurrentContext(g_MainImGuiContext);
         ImGui_ImplDX9_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
@@ -140,10 +150,15 @@ int UI::Run(UI::StartupState StartupDetails)
         else
             UI::Components::MainWindow();
 
-        if (Config::Data.DebugWindow)
-            ImGui::ShowDemoWindow(&Config::Data.DebugWindow);
+        if (IsStartupComplete) {
+            UI::Components::DebugPanel();
+            if (Config::Data.DebugWindow)
+                ImGui::ShowDemoWindow(&Config::Data.DebugWindow);
+        }
 
 
+
+        const float FrameDelta = ImGui::GetIO().DeltaTime;
 
         ImGui::EndFrame();
         g_pd3dDevice->SetRenderState(D3DRS_ZENABLE, FALSE);
@@ -160,13 +175,19 @@ int UI::Run(UI::StartupState StartupDetails)
         HRESULT result = g_pd3dDevice->Present(nullptr, nullptr, nullptr, nullptr);
         if (result == D3DERR_DEVICELOST)
             g_DeviceLost = true;
+
+        if (IsStartupComplete)
+            UI::Components::NotificationsWindow::RenderFrame(FrameDelta);
     }
 
     Globals::AppIsRunning = false;
 
+    UI::Components::NotificationsWindow::Shutdown();
+
     ImGui_ImplDX9_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+    g_MainImGuiContext = nullptr; // Stop WndProc from touching the freed context during DestroyWindow.
 
     CleanupDeviceD3D();
     ::DestroyWindow(hwnd);
@@ -216,8 +237,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
+    // The context may already be gone if a message (e.g. WM_DESTROY) is dispatched during shutdown.
+    if (g_MainImGuiContext)
+    {
+        ImGui::SetCurrentContext(g_MainImGuiContext);
+        if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+            return true;
+    }
 
     switch (msg)
     {
@@ -272,7 +298,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         POINT Pt = { X, Y };
         ScreenToClient(hWnd, &Pt);
-        if (PtInRect(&Globals::TitleBarDragRect, Pt))
+        if (PtInRect(&Globals::TitleBarDragRect, Pt) && Globals::TitleBarHovered)
             return HTCAPTION;
 
         return HTCLIENT;

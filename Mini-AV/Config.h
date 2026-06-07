@@ -5,6 +5,7 @@ namespace Config {
     struct CFGType {
 		// General/UI
 		bool DebugWindow = false;
+		bool DebugPanelWindow = false;
 		bool StylesWindow = false;
 
 		bool ViewAlerts = false;

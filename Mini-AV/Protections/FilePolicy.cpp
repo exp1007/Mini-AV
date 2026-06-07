@@ -1,6 +1,7 @@
 #include "FilePolicy.h"
 
 #include "Engines/ScanEngine.h"
+#include "Engines/EngineSettings.h"
 #include "FileIo.h"
 #include "Quarantine.h"
 #include "../Logging/Logging.h"
@@ -13,7 +14,43 @@ namespace {
 
 constexpr const WCHAR kBlockTestExe[] = L"MiniAvBlockTest.exe";
 constexpr const WCHAR kWindowsAppsSegment[] = L"\\Microsoft\\WindowsApps\\";
-constexpr size_t kMaxReadBytes = 4096;
+
+// Trusted directories — anything under these is always allowed (skipped before
+// the scan engine runs). They hold Windows-owned / installed, signed binaries
+// that load constantly; scanning them is wasted work and (with fail-closed on
+// errors) a needless risk to system stability. Matched as a case-insensitive
+// substring so both NT paths (\Device\HarddiskVolumeN\Windows\...) and Win32
+// paths (C:\Windows\...) are covered.
+// Caveat: substring matching also accepts any directory literally named the same
+// (e.g. C:\App\Windows\) — an accepted trade-off for the simpler, broader rule.
+constexpr const WCHAR* kAllowedPathSegments[] = {
+	L"\\Windows\\",                 // OS binaries (System32, SysWOW64, WinSxS, ...)
+	L"\\Program Files\\",           // installed 64-bit software
+	L"\\Program Files (x86)\\",     // installed 32-bit software
+	L"\\ProgramData\\Microsoft\\Windows Defender\\", // bundled AV components
+};
+
+// Trusted file names — always allowed regardless of location. Kept deliberately
+// short: matching by name alone is a known weakness (malware can adopt these
+// names), so only ubiquitous, false-positive-prone OS processes belong here.
+// Most real system binaries already live under the trusted directories above;
+// this list only helps when one is launched from an unusual location.
+constexpr const WCHAR* kAllowedFileNames[] = {
+	L"explorer.exe",
+	L"svchost.exe",
+	L"services.exe",
+	L"lsass.exe",
+	L"csrss.exe",
+	L"wininit.exe",
+	L"winlogon.exe",
+	L"smss.exe",
+	L"taskhostw.exe",
+	L"runtimebroker.exe",
+	L"dllhost.exe",
+	L"conhost.exe",
+	L"fontdrvhost.exe",
+	L"dwm.exe",
+};
 
 bool PathContainsInsensitive(const std::wstring& Path, const WCHAR* Needle)
 {
@@ -23,6 +60,41 @@ bool PathContainsInsensitive(const std::wstring& Path, const WCHAR* Needle)
 
 	for (size_t i = 0; Path[i] != L'\0'; ++i) {
 		if (_wcsnicmp(Path.c_str() + i, Needle, wcslen(Needle)) == 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Returns the file-name portion of a path (after the last backslash), stopping
+// at an ADS ':' if present.
+std::wstring FileNameOf(const std::wstring& Path)
+{
+	const WCHAR* path = Path.c_str();
+	const WCHAR* slash = wcsrchr(path, L'\\');
+	const WCHAR* name = slash ? (slash + 1) : path;
+	const WCHAR* colon = wcschr(name, L':');
+	const size_t len = colon ? static_cast<size_t>(colon - name) : wcslen(name);
+	return std::wstring(name, len);
+}
+
+// True when the path is in a trusted directory or has a trusted file name and so
+// should bypass scanning entirely.
+bool IsAlwaysAllowed(const std::wstring& Path)
+{
+	if (Path.empty()) {
+		return false;
+	}
+
+	for (const WCHAR* segment : kAllowedPathSegments) {
+		if (PathContainsInsensitive(Path, segment)) {
+			return true;
+		}
+	}
+
+	const std::wstring name = FileNameOf(Path);
+	for (const WCHAR* allowed : kAllowedFileNames) {
+		if (_wcsicmp(name.c_str(), allowed) == 0) {
 			return true;
 		}
 	}
@@ -93,6 +165,10 @@ bool ShouldEvaluateCreate(const MINIAV_CREATE_DECISION_REQUEST& Request)
 		return false;
 	}
 
+	if (IsAlwaysAllowed(ntPath) || IsAlwaysAllowed(win32Early)) {
+		return false;
+	}
+
 	const std::wstring win32Path = FileIo::NtPathToWin32(ntPath);
 	if (!win32Path.empty() && !HasExecutableExtension(win32Path)) {
 		return false;
@@ -116,6 +192,7 @@ ExecutionScanResult EvaluateExecutionCreate(const MINIAV_CREATE_DECISION_REQUEST
 	if (win32Path.empty()) {
 		result.Verdict = ScanVerdict::Error;
 		result.Reason = "NT path conversion failed";
+		result.Category = "Scan error";
 		LOG_ERROR("FilePolicy: %s for %ls", result.Reason.c_str(), ntPath.c_str());
 		return result;
 	}
@@ -130,6 +207,7 @@ ExecutionScanResult EvaluateExecutionCreate(const MINIAV_CREATE_DECISION_REQUEST
 	if (Quarantine::IsQuarantinePath(ntPath) || Quarantine::IsQuarantinePath(win32Path)) {
 		result.Verdict = ScanVerdict::Block;
 		result.Reason = "quarantine access denied";
+		result.Category = "Quarantine access";
 		result.ApplyQuarantine = false;
 		LOG_WARNING("FilePolicy: deny quarantine access path=%ls", win32Path.c_str());
 		return result;
@@ -138,6 +216,7 @@ ExecutionScanResult EvaluateExecutionCreate(const MINIAV_CREATE_DECISION_REQUEST
 	if (IsTestBlockFilename(ntPath) || IsTestBlockFilename(win32Path)) {
 		result.Verdict = ScanVerdict::Block;
 		result.Reason = "test rule";
+		result.Category = "Test rule";
 		LOG_WARNING("FilePolicy: block (test rule) path=%ls", win32Path.c_str());
 		return result;
 	}
@@ -155,17 +234,15 @@ ExecutionScanResult EvaluateExecutionCreate(const MINIAV_CREATE_DECISION_REQUEST
 		return result;
 	}
 
-	if (!HasExecutableExtension(win32Path)) {
+	if (IsAlwaysAllowed(ntPath) || IsAlwaysAllowed(win32Path)) {
 		result.Verdict = ScanVerdict::Allow;
-		result.Reason = "non-executable extension";
+		result.Reason = "allowlist skip";
 		return result;
 	}
 
-	std::vector<unsigned char> sample;
-	if (!FileIo::ReadFileSample(win32Path, sample, kMaxReadBytes)) {
-		result.Verdict = ScanVerdict::Error;
-		result.Reason = "file read failed";
-		LOG_ERROR("FilePolicy: %s path=%ls", result.Reason.c_str(), win32Path.c_str());
+	if (!HasExecutableExtension(win32Path)) {
+		result.Verdict = ScanVerdict::Allow;
+		result.Reason = "non-executable extension";
 		return result;
 	}
 
@@ -174,22 +251,27 @@ ExecutionScanResult EvaluateExecutionCreate(const MINIAV_CREATE_DECISION_REQUEST
 	context.NtPath = ntPath;
 	context.ProcessId = Request.ProcessId;
 	context.OperationSubtype = Request.OperationSubtype;
-	context.FileSample = std::move(sample);
 
-	const ScanEngine::ScanVerdict engineVerdict = ScanEngine::RunPipeline(context);
-	switch (engineVerdict) {
+	const ScanEngine::PipelineResult pipeline = ScanEngine::RunPipeline(context);
+	result.Score = pipeline.Score;
+	result.Suspicious = pipeline.Suspicious;
+	result.Dangerous = pipeline.Dangerous;
+	result.Category = pipeline.Category;
+	switch (pipeline.Verdict) {
 	case ScanEngine::ScanVerdict::Block:
 		result.Verdict = ScanVerdict::Block;
-		result.Reason = "engine block";
+		result.Reason = pipeline.Reason.empty() ? "engine block" : pipeline.Reason;
+		// Quarantine action is user-configurable: move the file, or deny only.
+		result.ApplyQuarantine = EngineSettings::Current.ApplyQuarantine;
 		break;
 	case ScanEngine::ScanVerdict::Error:
 		result.Verdict = ScanVerdict::Error;
-		result.Reason = "engine error";
+		result.Reason = pipeline.Reason.empty() ? "engine error" : pipeline.Reason;
 		break;
 	case ScanEngine::ScanVerdict::Allow:
 	default:
 		result.Verdict = ScanVerdict::Allow;
-		result.Reason = "engine allow";
+		result.Reason = pipeline.Reason.empty() ? "engine allow" : pipeline.Reason;
 		break;
 	}
 

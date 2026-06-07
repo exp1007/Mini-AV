@@ -90,7 +90,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>fltLib.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>fltLib.lib;shell32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -108,7 +108,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>fltLib.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>fltLib.lib;shell32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -125,7 +125,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d9.lib;fltLib.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d9.lib;fltLib.lib;shell32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -147,7 +147,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d9.lib;fltLib.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d9.lib;fltLib.lib;shell32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
@@ -162,10 +162,23 @@
     <ClCompile Include="Protections\FilePolicy.cpp" />
     <ClCompile Include="Protections\FileScan.cpp" />
     <ClCompile Include="Protections\Quarantine.cpp" />
-    <ClCompile Include="Protections\Engines\StubEngine.cpp" />
+    <ClCompile Include="Protections\Engines\EnginePipeline.cpp" />
+    <ClCompile Include="Protections\Engines\HashDatabase.cpp" />
+    <ClCompile Include="Protections\Engines\HashEngine.cpp" />
+    <ClCompile Include="Protections\Engines\PeImage.cpp" />
+    <ClCompile Include="Protections\Engines\ContextEngine.cpp" />
+    <ClCompile Include="Protections\Engines\CapabilityDatabase.cpp" />
+    <ClCompile Include="Protections\Engines\CapabilityEngine.cpp" />
+    <ClCompile Include="Protections\Engines\BytePattern.cpp" />
+    <ClCompile Include="Protections\Engines\AntiDebugEngine.cpp" />
+    <ClCompile Include="Protections\Engines\ScoreEngine.cpp" />
+    <ClCompile Include="Protections\Engines\ScoreConfig.cpp" />
     <ClCompile Include="Protections\Handles.cpp" />
     <ClCompile Include="Protections\Protections.cpp" />
     <ClCompile Include="UI\Components\MainWindow.cpp" />
+    <ClCompile Include="UI\Components\Notifications.cpp" />
+    <ClCompile Include="UI\Components\DebugPanel.cpp" />
+    <ClCompile Include="UI\Components\NotificationsWindow.cpp" />
     <ClCompile Include="UI\Components\StartupWindow.cpp" />
     <ClCompile Include="UI\Components\TitleBar.cpp" />
     <ClCompile Include="UI\ImGui\imgui.cpp" />
@@ -185,6 +198,18 @@
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Logging\Logging.h" />
     <ClInclude Include="Protections\Protections.h" />
+    <ClInclude Include="Protections\Engines\ScanEngine.h" />
+    <ClInclude Include="Protections\Engines\HashEngine.h" />
+    <ClInclude Include="Protections\Engines\HashDatabase.h" />
+    <ClInclude Include="Protections\Engines\PeImage.h" />
+    <ClInclude Include="Protections\Engines\ContextEngine.h" />
+    <ClInclude Include="Protections\Engines\CapabilityDatabase.h" />
+    <ClInclude Include="Protections\Engines\CapabilityEngine.h" />
+    <ClInclude Include="Protections\Engines\BytePattern.h" />
+    <ClInclude Include="Protections\Engines\AntiDebugEngine.h" />
+    <ClInclude Include="Protections\Engines\ScoreEngine.h" />
+    <ClInclude Include="Protections\Engines\ScoreConfig.h" />
+    <ClInclude Include="Protections\Engines\EngineSettings.h" />
     <ClInclude Include="UI\Globals.h" />
     <ClInclude Include="UI\ImGui\imconfig.h" />
     <ClInclude Include="UI\ImGui\imgui.h" />
@@ -194,6 +219,9 @@
     <ClInclude Include="UI\ImGui\imstb_rectpack.h" />
     <ClInclude Include="UI\ImGui\imstb_textedit.h" />
     <ClInclude Include="UI\ImGui\imstb_truetype.h" />
+    <ClInclude Include="UI\Components\Notifications.h" />
+    <ClInclude Include="UI\Components\DebugPanel.h" />
+    <ClInclude Include="UI\Components\NotificationsWindow.h" />
     <ClInclude Include="UI\UI.h" />
     <ClInclude Include="Utils\Driver\Communication.h" />
     <ClInclude Include="Utils\Driver\Setup.h" />

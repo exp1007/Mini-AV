@@ -10,7 +10,13 @@ void UI::Components::TitleBar()
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 8.0f, 4.0f });
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Style.WindowPadding.x, Style.ItemSpacing.y });
 
+	Globals::TitleBarHovered = false;
+
 	if (ImGui::BeginChild("Custom title bar", { 0.0f, Globals::TitleBarHeight }, ImGuiChildFlags_Border, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+		// If another window (demo, debug panel, popup) is over the title bar, this is false,
+		// so the WM_NCHITTEST handler won't steal its input for window dragging.
+		Globals::TitleBarHovered = ImGui::IsWindowHovered();
+
 		const float ButtonWidth = 40.0f;
 		const float ItemSpacing = ImGui::GetStyle().ItemSpacing.x;
 		const float ContentHeight = ImGui::GetContentRegionAvail().y;
