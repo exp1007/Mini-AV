@@ -116,7 +116,7 @@
       <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\Shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;TLSH_LIB;WIDNOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -136,7 +136,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;TLSH_LIB;WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -156,6 +156,10 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Logging\Logging.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Protections\Engines\TLSH\tlsh.cpp" />
+    <ClCompile Include="Protections\Engines\TLSH\tlsh_impl.cpp" />
+    <ClCompile Include="Protections\Engines\TLSH\tlsh_util.cpp" />
+    <ClCompile Include="Protections\Engines\TLSH\WinFunctions.cpp" />
     <ClCompile Include="Utils\Driver\Communication.cpp" />
     <ClCompile Include="Utils\Driver\Setup.cpp" />
     <ClCompile Include="Protections\FileIo.cpp" />
@@ -173,6 +177,8 @@
     <ClCompile Include="Protections\Engines\AntiDebugEngine.cpp" />
     <ClCompile Include="Protections\Engines\ScoreEngine.cpp" />
     <ClCompile Include="Protections\Engines\ScoreConfig.cpp" />
+    <ClCompile Include="Protections\Engines\TlshDatabase.cpp" />
+    <ClCompile Include="Protections\Engines\TlshEngine.cpp" />
     <ClCompile Include="Protections\Handles.cpp" />
     <ClCompile Include="Protections\Protections.cpp" />
     <ClCompile Include="UI\Components\MainWindow.cpp" />
@@ -194,6 +200,16 @@
   <ItemGroup>
     <ClInclude Include="Alerts\Alerts.h" />
     <ClInclude Include="Config.h" />
+    <ClInclude Include="External\TLSH\tlsh.h" />
+    <ClInclude Include="External\TLSH\tlsh_impl.h" />
+    <ClInclude Include="External\TLSH\tlsh_util.h" />
+    <ClInclude Include="External\TLSH\WinFunctions.h" />
+    <ClInclude Include="Protections\Engines\TLSH\input_desc.h" />
+    <ClInclude Include="Protections\Engines\TLSH\shared_file_functions.h" />
+    <ClInclude Include="Protections\Engines\TLSH\tlsh.h" />
+    <ClInclude Include="Protections\Engines\TLSH\tlsh_impl.h" />
+    <ClInclude Include="Protections\Engines\TLSH\tlsh_util.h" />
+    <ClInclude Include="Protections\Engines\TLSH\WinFunctions.h" />
     <ClInclude Include="Shared\MiniAvFilterMessages.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Logging\Logging.h" />
@@ -209,6 +225,8 @@
     <ClInclude Include="Protections\Engines\AntiDebugEngine.h" />
     <ClInclude Include="Protections\Engines\ScoreEngine.h" />
     <ClInclude Include="Protections\Engines\ScoreConfig.h" />
+    <ClInclude Include="Protections\Engines\TlshDatabase.h" />
+    <ClInclude Include="Protections\Engines\TlshEngine.h" />
     <ClInclude Include="Protections\Engines\EngineSettings.h" />
     <ClInclude Include="UI\Globals.h" />
     <ClInclude Include="UI\ImGui\imconfig.h" />

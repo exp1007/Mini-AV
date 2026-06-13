@@ -3,6 +3,7 @@
 #include "Engines/HashDatabase.h"
 #include "Engines/CapabilityDatabase.h"
 #include "Engines/ScoreConfig.h"
+#include "Engines/TlshDatabase.h"
 #include "Engines/EngineSettings.h"
 #include "FilePolicy.h"
 #include "Quarantine.h"
@@ -14,12 +15,14 @@ void InitializeFileScan()
 	HashDatabase::Initialize();
 	CapabilityDatabase::Initialize();
 	ScoreConfig::Initialize();
+	TlshDatabase::Initialize();
 	Quarantine::Initialize();
 }
 
 void ShutdownFileScan()
 {
 	Quarantine::Shutdown();
+	TlshDatabase::Shutdown();
 	ScoreConfig::Shutdown();
 	CapabilityDatabase::Shutdown();
 	HashDatabase::Shutdown();

@@ -63,6 +63,9 @@ std::string DeriveCategory(const std::vector<ScanEngine::Signal>& Signals)
 {
 	// Ordered most- to least-telling. First prefix that matches a fired signal wins.
 	static const struct { const char* Prefix; const char* Label; } kCategories[] = {
+		// A fuzzy match to a known-malware family is the most telling heuristic
+		// (just below the definitive hash short-circuit), so it ranks first.
+		{ "sim.",             "Known-malware similarity" },
 		{ "cap.ransom",       "Ransomware behaviour" },
 		{ "cap.injection",    "Process injection" },
 		{ "cap.cred_theft",   "Credential theft" },
@@ -73,7 +76,6 @@ std::string DeriveCategory(const std::vector<ScanEngine::Signal>& Signals)
 		{ "cap.anti_vm",      "Sandbox / VM evasion" },
 		{ "ad.",              "Anti-debugging" },
 		{ "cap.dynamic_api",  "Evasive API resolution" },
-		{ "sim.",             "Known-malware similarity" },
 		{ "ctx.double_ext",   "Disguised executable" },
 		{ "pe.packed",        "Packed / obfuscated code" },
 		{ "pe.malformed",     "Malformed executable" },

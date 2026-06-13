@@ -36,6 +36,15 @@ C_ASSERT( sizeof( MINIAV_CREATE_DECISION_REPLY ) == 32 );
 static PFLT_PORT gMiniAvClientPort = NULL;
 static ULONG gMiniAvClientPid = 0;
 
+//
+//  Run-down protection over the client port. The CREATE pre-callback holds it
+//  across FltSendMessage so the port object cannot be freed mid-send; the
+//  disconnect callback waits for all holders to drain before FltCloseClientPort.
+//  This closes the use-after-free race that bugchecks 0x18 (REFERENCE_BY_POINTER)
+//  inside FltSendMessage when a create and a disconnect run concurrently.
+//
+static EX_RUNDOWN_REF gMiniAvPortRundown;
+
 #define MINIAV_DRV_LOG_LEVEL   DPFLTR_WARNING_LEVEL
 #define MINIAV_LOG_DENY        0x00000001ul
 #define MINIAV_LOG_DIAG        0x00000002ul
@@ -60,6 +69,20 @@ ULONG gMiniAvLogFlags = MINIAV_LOG_DEFAULT;
 #pragma alloc_text(PAGE, PtMiniAvConnect)
 #pragma alloc_text(PAGE, PtMiniAvDisconnect)
 #endif
+
+VOID
+PtMiniAvInitialize (
+    VOID
+    )
+{
+    //
+    //  One-time init of the port run-down protection, before the communication
+    //  port is created (so before any connect/create can reference it). Each
+    //  connect re-initializes it for the new client session.
+    //
+    ExInitializeRundownProtection( &gMiniAvPortRundown );
+}
+
 
 static
 ULONG
@@ -128,6 +151,13 @@ PtMiniAvConnect (
         }
     }
 
+    //
+    //  The run-down protection is left armed by PtMiniAvInitialize and re-armed at
+    //  the end of each PtMiniAvDisconnect, so it is already usable here. (We must
+    //  not re-init it on the connect path: a create with no client may briefly hold
+    //  it around the NULL-port check, and re-initializing under a live holder
+    //  corrupts the count.)
+    //
     (VOID)InterlockedExchangePointer( (PVOID volatile *)&gMiniAvClientPort, ClientPort );
 
     MiniAvLog( MINIAV_LOG_DIAG, "port: client connected (%p) pid=%lu\n", ClientPort, gMiniAvClientPid );
@@ -147,11 +177,27 @@ PtMiniAvDisconnect (
 
     gMiniAvClientPid = 0;
 
+    //
+    //  Stop new creates from picking up the port, then wait for every in-flight
+    //  create that already acquired run-down protection (i.e. is inside or about
+    //  to call FltSendMessage) to release it. Only then is it safe to close the
+    //  port object — otherwise FltSendMessage would reference freed memory and
+    //  bugcheck 0x18. After this returns, no create can be using the port.
+    //
     (VOID)InterlockedExchangePointer( (PVOID volatile *)&gMiniAvClientPort, NULL );
+
+    ExWaitForRundownProtectionRelease( &gMiniAvPortRundown );
 
     if (clientPort != NULL) {
         FltCloseClientPort( gFilterHandle, &clientPort );
     }
+
+    //
+    //  Re-arm for the next session. Safe here: the wait above completed the
+    //  run-down, so no create can hold it and any concurrent acquire simply fails
+    //  (fail-open) until this re-init makes it usable again.
+    //
+    ExReInitializeRundownProtection( &gMiniAvPortRundown );
 
     MiniAvLog( MINIAV_LOG_DIAG, "port: client disconnected\n" );
 }
@@ -258,11 +304,25 @@ PtPreOperationCreateMiniAv (
         }
     }
 
+    //
+    //  Take run-down protection for the whole port-using region below (read the
+    //  port, then FltSendMessage). A failed acquire means a disconnect/teardown is
+    //  already in progress, so there is no usable port -> fail open. Every return
+    //  path after this point must release before returning.
+    //
+    if (!ExAcquireRundownProtection( &gMiniAvPortRundown )) {
+
+        MiniAvLog( MINIAV_LOG_DIAG, "CREATE: skip (port tearing down)\n" );
+        PtPassthroughRequestOpStatusIfNeeded( Data );
+        return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    }
+
     clientPort = (PFLT_PORT)InterlockedCompareExchangePointer( (PVOID volatile *)&gMiniAvClientPort,
                                                                NULL,
                                                                NULL );
     if (clientPort == NULL) {
 
+        ExReleaseRundownProtection( &gMiniAvPortRundown );
         MiniAvLog( MINIAV_LOG_DIAG, "CREATE: skip (no client on %ls)\n", MINIAV_PORT_NAME );
         PtPassthroughRequestOpStatusIfNeeded( Data );
         return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -275,6 +335,7 @@ PtPreOperationCreateMiniAv (
 
     if (!NT_SUCCESS( nameStatus )) {
 
+        ExReleaseRundownProtection( &gMiniAvPortRundown );
         MiniAvLog( MINIAV_LOG_DIAG, "CREATE: skip name query 0x%08X\n", nameStatus );
         PtPassthroughRequestOpStatusIfNeeded( Data );
         return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -323,6 +384,13 @@ PtPreOperationCreateMiniAv (
                                  &replyBody,
                                  &replyLength,
                                  &timeout );
+
+    //
+    //  Done with the port; the reply lives in local buffers from here on. Release
+    //  before the (potentially long) reply handling so disconnect isn't blocked
+    //  longer than the send itself.
+    //
+    ExReleaseRundownProtection( &gMiniAvPortRundown );
 
     FltReleaseFileNameInformation( nameInfo );
 

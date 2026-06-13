@@ -91,6 +91,12 @@ const char* DefaultConfigContent()
       "name": "Packed code + anti-debug",
       "bonus": 10,
       "requires": ["pe.packed", "ad."]
+    },
+    {
+      "id": "combo.similarity_capability",
+      "name": "Known-malware similarity + malicious capability",
+      "bonus": 20,
+      "requires": ["sim.", "cap."]
     }
   ]
 }

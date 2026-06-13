@@ -26,6 +26,12 @@ namespace EngineSettings {
 		bool UseContextEngine = true;
 		bool UseCapabilityEngine = true;
 		bool UseAntiDebugEngine = true;
+		bool UseTlshEngine = true;
+
+		// TLSH similarity threshold (Phase 5b): a blacklist digest within this distance
+		// counts as a match (0 = identical, larger = less similar). Tunable; ~70 is a
+		// common "same family" cutoff. A per-entry max_distance in tlsh.json overrides it.
+		int TlshMaxDistance = 70;
 
 		// Block action: move the offending file to quarantine (true) or merely deny
 		// the create (false). Applies to heuristic/engine blocks.

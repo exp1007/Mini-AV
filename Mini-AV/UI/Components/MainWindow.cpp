@@ -77,6 +77,11 @@ void DrawEngineColumn()
 	if (ImGui::Checkbox("Context heuristics (entropy / path / MOTW)", &E.UseContextEngine)) Config::SaveConfig();
 	if (ImGui::Checkbox("Capability / IAT analysis", &E.UseCapabilityEngine)) Config::SaveConfig();
 	if (ImGui::Checkbox("Anti-debug detection", &E.UseAntiDebugEngine)) Config::SaveConfig();
+	if (ImGui::Checkbox("TLSH fuzzy similarity (known-malware families)", &E.UseTlshEngine)) Config::SaveConfig();
+	ImGui::BeginDisabled(!E.UseTlshEngine);
+	ImGui::SetNextItemWidth(160.0f);
+	if (ImGui::SliderInt("TLSH match distance", &E.TlshMaxDistance, 0, 150)) Config::SaveConfig();
+	ImGui::EndDisabled();
 	ImGui::EndDisabled();
 }
 

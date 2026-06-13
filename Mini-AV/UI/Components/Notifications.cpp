@@ -55,6 +55,21 @@ namespace {
 		}
 	}
 
+	// Short severity word shown as an accent-colored prefix in the title row, so
+	// the user can tell warning vs critical at a glance regardless of the title text.
+	const char* GetTypeLabel(UI::Components::NotificationType Type)
+	{
+		switch (Type) {
+		case UI::Components::NotificationType::Warning:
+			return "WARNING";
+		case UI::Components::NotificationType::Critical:
+			return "CRITICAL";
+		case UI::Components::NotificationType::Info:
+		default:
+			return "INFO";
+		}
+	}
+
 	// Draws a crisp, perfectly-centered severity glyph inside the icon circle.
 	void DrawTypeIcon(ImDrawList* DrawList, ImVec2 Center, float Radius, UI::Components::NotificationType Type, ImU32 Col)
 	{
@@ -256,9 +271,14 @@ void UI::Components::Notifications::Render()
 			DrawList->AddCircleFilled(IconCenter, IconRadius, IconBgCol, 24);
 			DrawTypeIcon(DrawList, IconCenter, IconRadius, Entry.Type, AccentCol);
 
-			// ── Title ──
+			// ── Title: accent-colored severity label + the title text ──
+			const float TitleY = CardMin.y + CardPadding;
+			const char* TypeLabel = GetTypeLabel(Entry.Type);
+			DrawList->AddText(ImVec2(TitleX, TitleY), AccentCol, TypeLabel);
+			const float LabelWidth = Font->CalcTextSizeA(FontSize, FLT_MAX, 0.0f, TypeLabel).x;
+			constexpr float LabelToTitleGap = 8.0f;
 			DrawList->AddText(
-				ImVec2(TitleX, CardMin.y + CardPadding),
+				ImVec2(TitleX + LabelWidth + LabelToTitleGap, TitleY),
 				TitleCol, Entry.Title.c_str());
 
 			// ── Dismiss "×" button (top-right) ──

@@ -36,6 +36,7 @@ struct ScanContext {
 	unsigned long ProcessId = 0;
 	unsigned long OperationSubtype = 0;
 	std::string Sha256Hex;
+	std::string TlshHex;     // TLSH fuzzy digest of the file buffer (Phase 5b), empty if not computed/invalid
 
 	std::vector<Signal> Signals; // appended by collectors, read by ScoreEngine
 	PeInfo* Pe = nullptr;        // parsed-PE cache, owned elsewhere (Phase 1)

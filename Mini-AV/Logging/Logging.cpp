@@ -50,18 +50,32 @@ void Initialize()
 
 	SetConsoleTitleA("Mini-AV Console");
 
-	// Disable QuickEdit mode. With it on (the console default), a stray click or
-	// text selection in the window pauses ALL console output — which would block a
-	// worker thread inside printf while it holds LogMutex, deadlocking Shutdown()
-	// on the UI thread and hanging the whole app. ENABLE_QUICK_EDIT_MODE only takes
+	// Enable QuickEdit so the user can mark/select log text with the mouse and copy
+	// it (that flag is what unlocks mouse selection + Enter-to-copy). Trade-off,
+	// accepted on purpose: while a selection is held the console pauses ALL output,
+	// so a worker thread can block inside printf while holding LogMutex and Shutdown()
+	// will wait on that lock until the selection is released. That is a transient
+	// pause (finish/clear the selection and it resumes), not a permanent hang — and
+	// being able to copy the logs is worth it. ENABLE_QUICK_EDIT_MODE only takes
 	// effect alongside ENABLE_EXTENDED_FLAGS.
 	const HANDLE HInput = GetStdHandle(STD_INPUT_HANDLE);
 	if (HInput != INVALID_HANDLE_VALUE && HInput != nullptr) {
 		DWORD InputMode = 0;
 		if (GetConsoleMode(HInput, &InputMode)) {
-			InputMode &= ~ENABLE_QUICK_EDIT_MODE;
-			InputMode |= ENABLE_EXTENDED_FLAGS;
+			InputMode |= ENABLE_EXTENDED_FLAGS | ENABLE_QUICK_EDIT_MODE | ENABLE_INSERT_MODE;
 			SetConsoleMode(HInput, InputMode);
+		}
+	}
+
+	// Grow the scrollback buffer so older log lines stay scrollable (the default
+	// ~300-line height truncates history). Keep the existing width.
+	const HANDLE HOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (HOutput != INVALID_HANDLE_VALUE && HOutput != nullptr) {
+		CONSOLE_SCREEN_BUFFER_INFO BufferInfo{};
+		if (GetConsoleScreenBufferInfo(HOutput, &BufferInfo)) {
+			COORD BufferSize = BufferInfo.dwSize;
+			BufferSize.Y = 9000;
+			SetConsoleScreenBufferSize(HOutput, BufferSize);
 		}
 	}
 

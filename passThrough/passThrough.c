@@ -590,6 +590,12 @@ Return Value:
                                 NULL,
                                 sd );
 
+    //
+    //  Initialize Mini-AV port run-down protection before the port exists, so the
+    //  first connect/create already has a valid object to acquire.
+    //
+    PtMiniAvInitialize();
+
     status = FltCreateCommunicationPort( gFilterHandle,
                                          &gServerPort,
                                          &oa,

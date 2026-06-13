@@ -18,6 +18,11 @@ Environment:
 
 #include <fltKernel.h>
 
+VOID
+PtMiniAvInitialize (
+    VOID
+    );
+
 FLT_PREOP_CALLBACK_STATUS
 PtPreOperationCreateMiniAv (
     _Inout_ PFLT_CALLBACK_DATA Data,

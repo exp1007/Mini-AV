@@ -5,6 +5,7 @@
 #include "ContextEngine.h"
 #include "CapabilityEngine.h"
 #include "AntiDebugEngine.h"
+#include "TlshEngine.h"
 #include "ScoreEngine.h"
 #include "EngineSettings.h"
 
@@ -53,7 +54,8 @@ PipelineResult RunPipeline(ScanContext& Context)
 	if (cfg.UseContextEngine)    ContextEngine::Collect(Context);
 	if (cfg.UseCapabilityEngine) CapabilityEngine::Collect(Context);
 	if (cfg.UseAntiDebugEngine)  AntiDebugEngine::Collect(Context);
-	// Phase 5+: TLSH / IDA-signature collectors append here.
+	if (cfg.UseTlshEngine)       TlshEngine::Collect(Context);
+	// Phase 5c: IDA-signature collector appends here.
 
 	// (3) Final decision from accumulated signals.
 	PipelineResult result = ScoreEngine::Decide(Context);

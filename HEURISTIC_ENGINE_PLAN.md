@@ -16,7 +16,7 @@
 | 3 | `ScoreEngine` combos + config-driven thresholds | ☑ | `ScoreConfig` loads `scoring.json` (thresholds + combos) |
 | 4 | UI surfacing of signal list | ☑ | toast shows generic **category**; full detail in Alerts/Logs panel |
 | 5a | Byte-pattern matcher (`BytePattern`) | ☑ | matcher + dedicated `AntiDebugEngine` already built |
-| 5b | TLSH fuzzy hashing (`TlshEngine`) | ☐ | |
+| 5b | TLSH fuzzy hashing (`TlshEngine`) | ☑ | `TlshEngine` + `TlshDatabase` built & wired into pipeline/config/UI/scoring |
 | 5c | IDA-style specimen signatures | ☐ | reuses 5a matcher |
 
 **Session notes**
@@ -110,10 +110,55 @@
   the body (replacing the old full-detail body); panel + logs keep the full
   `details`. Backward compatible — `DebugPanel` 2-arg calls still show their full
   example text. Next: Phase 5b (TLSH) or 5c (specimen sigs), both optional.
-
----
-
-## Goal
+- 2026-06-12: **Phase 5b planning.** TLSH library vendored under
+  `Protections/Engines/TLSH/` and confirmed compiling, built statically into the exe
+  with `TLSH_LIB` defined (no `.lib`/`.dll`, matching the json.hpp/ImGui vendoring;
+  the export macros are gated on `TLSH_EXPORTS`/`dllimport`, which we avoid). API
+  confirmed from the vendored `simple_unittest.cpp` (`final` / `isValid` / `getHash` /
+  `fromTlshStr` / `totalDiff`). Wrote the detailed implementation plan (see the
+  expanded **Phase 5b** section): a `TlshEngine` collector that hashes the existing
+  `Context.Pe->Buffer` (zero extra I/O, runs at the `EnginePipeline.cpp:56`
+  placeholder) + a `TlshDatabase` mirroring `HashDatabase` (loads
+  `%ProgramData%\MiniAV\tlsh.json`, pre-parses each blacklist digest once), a
+  distance-banded weighted `sim.family` signal, a `UseTlshEngine`/`TlshMaxDistance`
+  knob, and `DeriveCategory` + combo surfacing. Not yet implemented. Next: build
+  `TlshDatabase` + `TlshEngine` per the checklist.
+- 2026-06-12: **Phase 5b — `TlshDatabase` + `TlshEngine` built** (not yet wired into
+  the pipeline). `TlshDatabase` mirrors `HashDatabase`: loads
+  `%ProgramData%\MiniAV\tlsh.json` (`tlsh_deny` array of
+  `{tlsh,name,family,max_distance}`), default-write-if-missing, load-once,
+  mutex-guarded; pre-parses each digest via `fromTlshStr` and drops invalid ones;
+  `Match()` returns the smallest-distance entry within its limit. `TlshEngine::Collect`
+  digests `Context.Pe->Buffer` (zero extra I/O), skips on `!isValid()`, records
+  `Context.TlshHex = getHash(1)`, and on a match appends one distance-banded
+  `sim.family` signal (≤30→45/High, ≤50→30/Med, else 18/Low). Added supporting fields
+  `ScanContext.TlshHex` and `EngineSettings.UseTlshEngine`/`TlshMaxDistance` (default
+  70). Registered all four files in `.vcxproj`/`.filters`. **Remaining wiring:**
+  `FileScan` Initialize/Shutdown, the `EnginePipeline.cpp:56` collector call,
+  `Config` persistence, the `MainWindow` toggle, and `ScoreEngine::DeriveCategory` +
+  combo. **Heads-up:** the Debug config defines `TLSH_LIB` but not `WINDOWS`, which
+  the TLSH header needs on MSVC — currently only Release defines both.
+- 2026-06-12: **Phase 5b wired & complete** (`WINDOWS` now defined in Debug too).
+  `TlshDatabase::Initialize/Shutdown` added to `FileScan.cpp`; the collector runs as
+  `if (cfg.UseTlshEngine) TlshEngine::Collect(Context)` after AntiDebug in
+  `EnginePipeline`; `Config` persists `Engine.UseTlshEngine` + `Engine.TlshMaxDistance`;
+  `MainWindow` got a TLSH checkbox + a "match distance" slider (gated on the toggle);
+  `DeriveCategory` ranks `sim.` first ("Known-malware similarity"); a default
+  `sim.`+`cap.` combo (+20) was added to `scoring.json`. `TlshEngine` also `LOG_INFO`s
+  each file's computed digest so a sample's `T1...` can be copied straight into
+  `tlsh.json`. Note: `scoring.json` is load-once, so the new combo only appears on a
+  fresh install (delete the file to regenerate). Not yet built/verified this session.
+- 2026-06-12: **TLSH switched to code-section (.text) hashing + Debug Panel add form.**
+  Whole-file TLSH was dominated by MSVC/CRT/import/resource boilerplate, so small
+  binaries all looked similar (poor sensitivity *and* specificity). `TlshEngine::Collect`
+  now `update()`s the digest over the executable sections only (from
+  `Context.Pe->Sections`, each span clamped to the buffer) then `final()`s —
+  fingerprinting code, not the PE wrapper. Files with no exec-section bytes or too
+  little code (`!isValid()`) get no signal. **Consequence:** digests previously
+  curated as whole-file hashes won't match the new `.text` digests — re-add samples
+  from the updated `tlsh(text)=` log line. Also added the Debug Panel "TLSH blacklist"
+  form (`TlshDatabase::AddEntry`) for validated, live, no-restart additions to
+  `tlsh.json` (the elevated service can write the restricted ProgramData path).
 
 Evolve the scan pipeline from a single "first engine to Block wins" model into a
 **hybrid scoring system**: definitive verdicts still short-circuit, but everything
@@ -366,26 +411,131 @@ loop or PEB walk shape appears across many unrelated binaries.
 | **Shellcode decryption loop** | common XOR-decrypt-in-place loop shapes |
 | **Stack-string construction** | runs of `mov byte ptr [...], <imm>` building strings in memory |
 
-### 5b — TLSH fuzzy hashing (family similarity)
+### 5b — TLSH fuzzy hashing (family similarity) — detailed implementation plan
 
 Exact SHA-256 in `HashEngine` only catches a byte-identical file; flip one byte
 and it misses. **TLSH (Trend Micro Locality Sensitive Hash)** produces a digest
 where *similar* files yield *close* digests, so a known-malware variant still
-scores near a blacklisted sample.
-
-- Compute the TLSH digest of the file buffer (Phase 1 already has it in memory).
-- Keep a blacklist of digests in `%ProgramData%\MiniAV\tlsh.json` (same loader
-  pattern as `hashes.json`), each with a name and family.
-- For each blacklist entry, compute TLSH distance. Distance is a small integer
-  where **0 = identical, lower = more similar**; a threshold (~tunable, ~40–70
-  depending on tolerance) decides a hit.
-- A hit appends a `Signal` like `sim.family` with the matched family name and the
-  distance, e.g. *"Similar to Emotet variant (TLSH distance 31)."*
+scores near a blacklisted sample. It is **fuzzy/probabilistic**, so it feeds the
+score as a weighted signal, never a lone hard block (combine with capabilities).
 
 Why TLSH over `ssdeep`: a fixed-length digest, robust against small edits and
 padding, and a single well-defined distance function — clean to embed and to
-explain in the thesis. It is **fuzzy/probabilistic**, so it feeds the score as a
-weighted signal rather than a hard block on its own (combine with capabilities).
+explain in the thesis.
+
+**Status:** library vendored under `Protections/Engines/TLSH/`, compiles
+statically into `Mini-AV.exe` with `TLSH_LIB` defined (no `.lib`/`.dll`, matching
+how `json.hpp`/ImGui are vendored — and avoiding a DLL-hijack surface on an AV).
+
+#### TLSH API surface we use (confirmed from `TLSH/simple_unittest.cpp`)
+
+- `Tlsh t; t.final(const unsigned char* data, unsigned int len);` — one-shot digest
+  over a buffer.
+- `bool t.isValid();` — false when the input was too small / too low-variance to
+  digest (TLSH needs ≳50 bytes and enough byte diversity). **Must check before use.**
+- `const char* t.getHash(1);` — digest string, version-prefixed (`T1...`).
+- `t.fromTlshStr(const char* s);` — rebuild a `Tlsh` from a stored digest string
+  (accepts the `T1` prefix).
+- `int a.totalDiff(&b, /*lenDiff=*/true);` — distance; **0 = identical, larger =
+  less similar**. Use the length-aware form for files.
+
+#### Integration reuses what already exists (no second file read)
+
+`EnginePipeline.cpp` already parses the PE once and exposes the **raw file bytes**
+as `Context.Pe->Buffer` (capped at 64 MB). TLSH hashes that buffer directly, so the
+collector runs in step (2) of `RunPipeline`, after `PeImage::Parse`, exactly like
+`ContextEngine`/`CapabilityEngine` — the placeholder comment is already at
+`EnginePipeline.cpp:56`. Add `std::string TlshHex;` to `ScanContext` (beside
+`Sha256Hex`) so the digest flows into logs and `PipelineResult`, and so a sample's
+digest is trivial to read off when curating the blacklist.
+
+#### New files (mirror the `HashEngine` + `HashDatabase` split)
+
+**`TlshDatabase.cpp/.h`** — same ProgramData-JSON idiom as `HashDatabase` /
+`CapabilityDatabase`:
+- Loads `%ProgramData%\MiniAV\tlsh.json`, writes a default (empty list) if missing,
+  mutex-guarded, **load-once** (no hot-reload, matching the others).
+- Schema:
+  ```json
+  {
+    "tlsh_deny": [
+      { "tlsh": "T1A1B2...", "name": "Emotet loader", "family": "Emotet", "max_distance": 70 }
+    ]
+  }
+  ```
+- At load, each entry's `tlsh` string is parsed **once** via `fromTlshStr` into an
+  in-memory `Tlsh` (skip + log entries that fail validation), so per-scan matching
+  costs only `totalDiff`, never a re-parse. `max_distance` is optional per entry
+  (falls back to the global threshold).
+- API: `Initialize()`, `Shutdown()`, `size_t EntryCount()`, `std::wstring
+  DatabasePath()`, and `Match(const Tlsh& candidate)` returning the best
+  (smallest-distance) entry within threshold plus its distance.
+
+**`TlshEngine.cpp/.h`** — the collector `Collect(ScanContext&)`:
+1. Guard on `Context.Pe && Context.Pe->Read && !Context.Pe->Buffer.empty()`.
+2. `Tlsh t; t.final(Buffer.data(), (unsigned)Buffer.size());` → if `!t.isValid()`
+   return (tiny/low-variance file — just no signal).
+3. Store `t.getHash(1)` into `Context.TlshHex`.
+4. `TlshDatabase::Match(t)` → on a hit, `AddSignal("sim.family", "Similar to <name>
+   (<family>), TLSH distance <d>", score, conf)`.
+5. **Score/confidence by distance band** (closer = stronger), tunable constants:
+
+   | distance | score | confidence |
+   |---|---|---|
+   | ≤ 30 | 45 | High |
+   | ≤ 50 | 30 | Medium |
+   | ≤ threshold (default 70) | 18 | Low |
+
+   Only the **best** match emits a signal (don't stack near-duplicates of one
+   family). The weighting lets a *single distant* hit only nudge the score, while a
+   *close* hit — or a close hit plus a capability — reaches Block via bands/combos.
+
+#### Settings / config
+
+- Add `bool UseTlshEngine = true;` and `int TlshMaxDistance = 70;` to
+  `EngineSettings::Settings`.
+- Persist both in `Config.cpp` (`Engine.UseTlshEngine`, `Engine.TlshMaxDistance`)
+  via the existing `j.value(...)` pattern.
+- Gate the collector with `if (cfg.UseTlshEngine)` in `RunPipeline`.
+- Add a checkbox to `MainWindow.cpp`'s per-engine section, like the others.
+
+#### Score / category surfacing
+
+- Extend `ScoreEngine::DeriveCategory` with `sim.` → "Known malware family
+  (similarity)" (priority just under the definitive hash block, above generic
+  capabilities).
+- Optional `scoring.json` combo: `sim.family` + `cap.*` (e.g. similarity +
+  injection) for an extra bonus — a fuzzy family hit *and* a malicious capability
+  together is much stronger than either alone.
+
+#### Wiring checklist
+
+- `FileScan.cpp`: `TlshDatabase::Initialize()` / `Shutdown()` next to `HashDatabase`.
+- `EnginePipeline.cpp:56`: `if (cfg.UseTlshEngine) TlshEngine::Collect(Context);`.
+- `ScanEngine.h`: add `TlshHex`.
+- `Mini-AV.vcxproj` + `.filters`: register `TlshEngine.*`, `TlshDatabase.*` (the
+  TLSH library `.cpp`s are already in the project; define `TLSH_LIB` project-wide).
+- `EngineSettings.h`, `Config.cpp`, `MainWindow.cpp`, `ScoreEngine.cpp`, default
+  `scoring.json`: as above.
+
+#### Curating the blacklist (demo workflow)
+
+`Context.TlshHex` is logged on every scan, so: run a known sample through Mini-AV,
+copy its `T1...` digest from the logs into `tlsh.json` with a name/family, restart,
+and every near-variant of that sample now matches. (A future convenience would be a
+one-shot "compute TLSH of file X" path, but reading it from the log is enough for
+the demo.)
+
+#### Edge cases for the write-up
+
+- TLSH refuses tiny/low-entropy inputs (`isValid()==false`) → those files get no
+  `sim` signal; the other engines still run (this layer fails open).
+- Packed files: TLSH characterizes the *packer*, not the payload (same caveat as the
+  byte patterns below) — sign the stub or an unpacked dump.
+- Distance is not a probability; the threshold is empirical. 70 is a common
+  "same family" cutoff; lower toward 30–50 for fewer false matches.
+
+**Effort:** ~1 day (library already integrated).
 
 ### 5c — IDA-style specimen signatures (analyst blacklisting)
 
@@ -466,7 +616,9 @@ Mini-AV/Protections/Engines/
 ├── CapabilityEngine.cpp / .h   # Phase 2 — imports/strings/bytes -> capabilities
 ├── ScoreEngine.cpp / .h        # Phase 3 — aggregate signals -> verdict
 ├── BytePattern.cpp / .h        # Phase 5a — hex+mask matcher (shared by 5a & 5c)
-├── TlshEngine.cpp / .h         # Phase 5b — fuzzy digest + distance vs blacklist
+├── TlshEngine.cpp / .h         # Phase 5b — collector: digest Context.Pe->Buffer, match vs blacklist
+├── TlshDatabase.cpp / .h       # Phase 5b — tlsh.json loader (HashDatabase idiom), pre-parsed digests
+├── TLSH/                       # Phase 5b — vendored Trend Micro TLSH source (compiled with TLSH_LIB)
 └── (capabilities.json, tlsh.json, signatures.json live under %ProgramData%\MiniAV\)
 ```
 

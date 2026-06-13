@@ -132,6 +132,12 @@
     <ClCompile Include="Protections\Engines\ScoreConfig.cpp">
       <Filter>Source Files\Protections</Filter>
     </ClCompile>
+    <ClCompile Include="Protections\Engines\TlshDatabase.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\TlshEngine.cpp">
+      <Filter>Source Files\Protections</Filter>
+    </ClCompile>
     <ClCompile Include="Protections\Engines\PeImage.cpp">
       <Filter>Source Files\Protections</Filter>
     </ClCompile>
@@ -149,6 +155,30 @@
     </ClCompile>
     <ClCompile Include="Protections\Engines\AntiDebugEngine.cpp">
       <Filter>Source Files\Protections</Filter>
+    </ClCompile>
+    <ClCompile Include="External\TLSH\tlsh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\TLSH\tlsh_impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\TLSH\tlsh_util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\TLSH\WinFunctions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\TLSH\tlsh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\TLSH\tlsh_impl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\TLSH\tlsh_util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Protections\Engines\TLSH\WinFunctions.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -217,6 +247,78 @@
     </ClInclude>
     <ClInclude Include="UI\Components\NotificationsWindow.h">
       <Filter>Source Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\ScanEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\HashEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\HashDatabase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\PeImage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\ContextEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\CapabilityDatabase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\CapabilityEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\BytePattern.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\AntiDebugEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\ScoreEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\ScoreConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TlshDatabase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TlshEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\EngineSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\TLSH\tlsh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\TLSH\tlsh_impl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\TLSH\tlsh_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\TLSH\WinFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\tlsh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\tlsh_impl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\tlsh_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\WinFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\input_desc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Protections\Engines\TLSH\shared_file_functions.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

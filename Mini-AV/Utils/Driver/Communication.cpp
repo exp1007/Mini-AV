@@ -16,6 +16,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 #include <fltuser.h>
@@ -68,6 +69,41 @@ static std::string PathToUtf8(const std::wstring& Path)
 	return out;
 }
 
+// De-dup for user-facing alerts only. A single launch makes the OS issue several
+// IRP_MJ_CREATEs for the same file (open-for-read, open-for-execute, image-section
+// map, ...). Each yields an identical verdict, which would raise the same toast 3x.
+// We suppress repeat alerts for the same path+kind seen within a short window so one
+// launch == one notification. Enforcement (deny reply), quarantine and console
+// logging still run on every request — only Alerts::Add is gated.
+std::mutex g_recentAlertsMutex;
+std::unordered_map<std::wstring, ULONGLONG> g_recentAlerts; // path|kind -> last-alert tick (ms)
+constexpr ULONGLONG kAlertDedupWindowMs = 2000;
+
+static bool ShouldRaiseAlert(const std::wstring& path, int kind)
+{
+	const ULONGLONG now = GetTickCount64();
+	const std::wstring key = path + L"|" + std::to_wstring(kind);
+
+	std::lock_guard<std::mutex> lock(g_recentAlertsMutex);
+
+	// Prune stale entries so the map can't grow without bound.
+	for (auto it = g_recentAlerts.begin(); it != g_recentAlerts.end();) {
+		if (now - it->second > kAlertDedupWindowMs)
+			it = g_recentAlerts.erase(it);
+		else
+			++it;
+	}
+
+	auto found = g_recentAlerts.find(key);
+	if (found != g_recentAlerts.end()) {
+		// Refresh so a continuous burst keeps extending the suppression window.
+		found->second = now;
+		return false;
+	}
+	g_recentAlerts[key] = now;
+	return true;
+}
+
 static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINIAV_CREATE_DECISION_REPLY* outReply)
 {
 	outReply->Magic = MINIAV_MSG_MAGIC;
@@ -84,8 +120,20 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 	const wchar_t* const reqPath = (req->Path[0] != L'\0') ? req->Path : L"(empty)";
 	const std::string reason = result.Reason.empty() ? std::string("(no reason)") : result.Reason;
 
-	// Every action taken (block / deny / dangerous / suspicious) is reported every
-	// time it happens — no per-path de-dup — so the user always sees what occurred.
+	// Toast body = short category + the blocked file's path (on its own line). The
+	// path is what the user most wants to see; the full signal list stays in the panels.
+	const std::string toastPath = PathToUtf8(result.ResolvedPath);
+	auto toastBodyWith = [&](const char* fallbackCategory) {
+		const std::string category = result.Category.empty() ? std::string(fallbackCategory) : result.Category;
+		return toastPath.empty() ? category : category + "\n" + toastPath;
+	};
+
+	// Stable key for alert de-dup: the resolved path (falls back to the raw NT path).
+	const std::wstring dedupKey = !result.ResolvedPath.empty() ? result.ResolvedPath : std::wstring(req->Path);
+
+	// Enforcement runs on every request, but the user-facing alert is de-duped via
+	// ShouldRaiseAlert (one notification per path+kind within a short window) so a
+	// single launch's burst of IRP_MJ_CREATEs doesn't raise the same toast 3x.
 	switch (result.Verdict) {
 	case Protections::ScanVerdict::Block: {
 		if (result.ApplyQuarantine && !result.ResolvedPath.empty()) {
@@ -105,11 +153,13 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 			req->OperationSubtype,
 			reqPath,
 			reason.c_str());
-		Alerts::Add(
-			"Execution blocked: " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
-			AlertRisk::high,
-			"",
-			result.Category.empty() ? "Malicious file" : result.Category);
+		if (ShouldRaiseAlert(dedupKey, 1)) {
+			Alerts::Add(
+				"Execution blocked: " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+				AlertRisk::high,
+				"",
+				toastBodyWith("Malicious file"));
+		}
 		break;
 	}
 	case Protections::ScanVerdict::Error: {
@@ -120,11 +170,13 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 			req->OperationSubtype,
 			reqPath,
 			reason.c_str());
-		Alerts::Add(
-			"Access denied (scan error): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
-			AlertRisk::medium,
-			"",
-			result.Category.empty() ? "Scan error" : result.Category);
+		if (ShouldRaiseAlert(dedupKey, 2)) {
+			Alerts::Add(
+				"Access denied (scan error): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+				AlertRisk::medium,
+				"",
+				toastBodyWith("Scan error"));
+		}
 		break;
 	}
 	case Protections::ScanVerdict::Allow:
@@ -140,11 +192,13 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 				req->ProcessId,
 				reqPath,
 				reason.c_str());
-			Alerts::Add(
-				"Potentially dangerous (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
-				AlertRisk::medium,
-				"",
-				result.Category.empty() ? "Potentially dangerous" : result.Category);
+			if (ShouldRaiseAlert(dedupKey, 3)) {
+				Alerts::Add(
+					"Potentially dangerous (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+					AlertRisk::medium,
+					"",
+					toastBodyWith("Potentially dangerous"));
+			}
 		} else if (result.Suspicious) {
 			LOG_INFO(
 				"Mini-AV filter: ALLOW (suspicious score=%d) pid=%lu path=%ls reason=%s",
@@ -152,11 +206,13 @@ static void EvaluateCreatePolicy(const MINIAV_CREATE_DECISION_REQUEST* req, MINI
 				req->ProcessId,
 				reqPath,
 				reason.c_str());
-			Alerts::Add(
-				"Suspicious (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
-				AlertRisk::low,
-				"",
-				result.Category.empty() ? "Suspicious file" : result.Category);
+			if (ShouldRaiseAlert(dedupKey, 4)) {
+				Alerts::Add(
+					"Suspicious (allowed): " + PathToUtf8(result.ResolvedPath) + "\n" + reason,
+					AlertRisk::low,
+					"",
+					toastBodyWith("Suspicious file"));
+			}
 		}
 		break;
 	}

@@ -6,6 +6,8 @@
 #include "Quarantine.h"
 #include "../Logging/Logging.h"
 
+#include <Windows.h>
+
 #include <cwchar>
 #include <string>
 #include <vector>
@@ -78,8 +80,27 @@ std::wstring FileNameOf(const std::wstring& Path)
 	return std::wstring(name, len);
 }
 
-// True when the path is in a trusted directory or has a trusted file name and so
-// should bypass scanning entirely.
+// Our own executable's file name, resolved once from the running module. A security
+// product must never quarantine itself: Mini-AV.exe embeds every detection string it
+// looks for (tool names like 'ollydbg', the self-delete / cred-theft / anti-VM rule
+// literals, ...), so scanning its own image makes those capability rules fire and it
+// self-detects. Matching by name carries the same accepted weakness as kAllowedFileNames
+// (malware could adopt the name), which is fine for this POC.
+const std::wstring& OwnExecutableName()
+{
+	static const std::wstring name = []() -> std::wstring {
+		WCHAR buffer[MAX_PATH] = {};
+		const DWORD len = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+		if (len == 0 || len >= MAX_PATH) {
+			return std::wstring();
+		}
+		return FileNameOf(std::wstring(buffer, len));
+	}();
+	return name;
+}
+
+// True when the path is in a trusted directory, has a trusted file name, or is our
+// own executable, and so should bypass scanning entirely.
 bool IsAlwaysAllowed(const std::wstring& Path)
 {
 	if (Path.empty()) {
@@ -97,6 +118,11 @@ bool IsAlwaysAllowed(const std::wstring& Path)
 		if (_wcsicmp(name.c_str(), allowed) == 0) {
 			return true;
 		}
+	}
+
+	const std::wstring& self = OwnExecutableName();
+	if (!self.empty() && _wcsicmp(name.c_str(), self.c_str()) == 0) {
+		return true;
 	}
 	return false;
 }
